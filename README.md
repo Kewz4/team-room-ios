@@ -36,20 +36,23 @@ This repo does not hold certificates or provisioning profiles. Sign on your devi
 The tunnel hostname is temporary (Cloudflare Quick Tunnel): if it changes after a tunnel restart, create a fresh device
 link and paste it again; the app re-pairs in place.
 
-## What it does today (v1)
+## What it does today (v0.2)
 
-- Teammate tabs with brand icons (DeepSeek / OpenAI / Claude) and live state.
-- Real conversation view: transcript messages, live streaming reply text, and expandable tool/command/file activity rows.
+- Hamburger teammate drawer with brand icons (DeepSeek / OpenAI / Claude), state dots and weekly usage.
+- Real conversation view: transcript messages, live streaming reply text, and compact **activity dropdowns**
+  ("Used 2 tools, ran 3 commands ›") that expand into one-line tool rows with full detail sheets.
+- Inline image previews from `/api/media` (cookie-authenticated, downsampled, bounded cache) with a full-screen viewer.
+- Scroll-to-bottom control that appears when you scroll back through history.
 - Delivery queue with states (queued, waiting for busy/connection), cancel, retry, and **Stop this turn**.
-- Live updates over `/live` WebSocket with a polling fallback and reconnects.
-- Settings: teammate usage, recheck runners, create device links, sign out.
+- Live updates over `/live` WebSocket (coalesced frames) with a slow safety poll; polling pauses in the background.
+- Warm-neutral design system with one pine accent, light/dark tokens, 8pt grid, SF Symbols only.
 - Pairing/security: device-link sign-in only, cookie in Keychain, no credentials or links in the repo.
 
 ## Not yet (next)
 
 - Message **steering** ("Steer now" vs "Queue next") — the app is ready to send a `mode` field on `POST /api/messages`,
   but the server side must ship first (planned in the Team Room rework).
-- Inline image previews from `/api/media`, message search, push notifications.
+- Message search, push notifications.
 
 ## API used
 

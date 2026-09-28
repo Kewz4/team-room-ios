@@ -11,6 +11,7 @@ final class AppModel {
     var pairingBusy = false
     var baseURLString = ""
     var agents: [Agent] = []
+    var items: [ConversationItem] = []
     var selectedId = ""
     var revision = 0
     var lastSync: Date?
@@ -21,13 +22,21 @@ final class AppModel {
     var sending = false
 
     let client = TeamRoomClient()
+    let images: ImageStore
     private var pollTask: Task<Void, Never>?
     private var debounceTask: Task<Void, Never>?
+    private var streamFlushTask: Task<Void, Never>?
+    private var pendingFrames: [String: WsFrame] = [:]
     private var socketTask: URLSessionWebSocketTask?
     private var socketGeneration = 0
     private var refreshing = false
     private var refreshAgain = false
+    private var foreground = true
     private var eventCache: [String: EventDetail] = [:]
+
+    init() {
+        images = ImageStore(client: client)
+    }
 
     var selectedAgent: Agent? { agents.first { $0.id == selectedId } }
 
@@ -44,6 +53,24 @@ final class AppModel {
         await client.configure(baseURL: url, cookie: token)
         phase = .connecting
         await connect()
+    }
+
+    func sceneChanged(_ active: Bool) {
+        guard phase == .ready else { return }
+        foreground = active
+        guard active else {
+            pollTask?.cancel()
+            pollTask = nil
+            debounceTask?.cancel()
+            socketGeneration += 1
+            socketTask?.cancel(with: .goingAway, reason: nil)
+            socketTask = nil
+            socketNote = "offline"
+            return
+        }
+        refresh()
+        startPolling()
+        startSocket()
     }
 
     private func connect() async {
@@ -128,6 +155,7 @@ final class AppModel {
     func select(_ id: String) {
         guard id != selectedId else { return }
         selectedId = id
+        items = []
         refresh()
     }
 
@@ -160,13 +188,24 @@ final class AppModel {
     }
 
     private func apply(_ state: StateResponse) {
-        agents = state.agents
         if let value = state.revision { revision = value }
-        lastSync = Date()
-        syncError = nil
-        if selectedId.isEmpty || !agents.contains(where: { $0.id == selectedId }) {
+        var list = state.agents
+        if selectedId.isEmpty || !list.contains(where: { $0.id == selectedId }) {
             selectedId = defaultAgentId()
         }
+        if let index = list.firstIndex(where: { $0.id == selectedId }) {
+            for other in list.indices where other != index {
+                list[other].messages = nil
+                list[other].events = nil
+            }
+            let agent = list[index]
+            items = ConversationBuilder.items(messages: agent.messages ?? [], events: agent.events ?? [])
+        } else {
+            items = []
+        }
+        agents = list
+        lastSync = Date()
+        syncError = nil
     }
 
     private func defaultAgentId() -> String {
@@ -174,23 +213,25 @@ final class AppModel {
         return agents.first?.id ?? ""
     }
 
-    private func scheduleRefresh() {
+    private func scheduleRefresh(after delay: Duration = .milliseconds(700)) {
         debounceTask?.cancel()
         debounceTask = Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(350))
+            try? await Task.sleep(for: delay)
             guard !Task.isCancelled else { return }
             refresh()
         }
     }
 
-    // MARK: - Polling
+    // MARK: - Polling (slow safety net; the socket drives normal updates)
 
     private func startPolling() {
         pollTask?.cancel()
         pollTask = Task { @MainActor [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(6))
-                guard !Task.isCancelled, let self else { return }
+                guard let self else { return }
+                let interval: Duration = self.socketNote == "live" ? .seconds(20) : .seconds(5)
+                try? await Task.sleep(for: interval)
+                guard !Task.isCancelled else { return }
                 self.refresh()
             }
         }
@@ -199,6 +240,7 @@ final class AppModel {
     // MARK: - Live socket
 
     private func startSocket() {
+        guard foreground else { return }
         socketGeneration += 1
         let generation = socketGeneration
         Task { @MainActor in
@@ -240,9 +282,9 @@ final class AppModel {
     }
 
     private func scheduleReconnect(generation: Int) {
-        guard generation == socketGeneration else { return }
+        guard generation == socketGeneration, foreground else { return }
         Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(3))
+            try? await Task.sleep(for: .seconds(4))
             guard let self, generation == self.socketGeneration else { return }
             self.startSocket()
         }
@@ -252,27 +294,41 @@ final class AppModel {
         switch frame.type {
         case "connected":
             socketNote = "live"
-            scheduleRefresh()
+            scheduleRefresh(after: .milliseconds(400))
         case "changed":
             socketNote = "live"
             scheduleRefresh()
-        case "activity":
+        case "activity", "stream":
             socketNote = "live"
+            buffer(frame)
+        default:
+            break
+        }
+    }
+
+    /// Coalesce high-frequency stream/activity frames into one UI update (~140 ms).
+    private func buffer(_ frame: WsFrame) {
+        pendingFrames[frame.type + ":" + (frame.agentId ?? "")] = frame
+        guard streamFlushTask == nil else { return }
+        streamFlushTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(140))
+            guard let self else { return }
+            self.streamFlushTask = nil
+            self.applyPendingFrames()
+        }
+    }
+
+    private func applyPendingFrames() {
+        let frames = Array(pendingFrames.values)
+        pendingFrames.removeAll()
+        for frame in frames {
             updateAgent(frame.agentId) { agent in
+                if frame.type == "stream" { agent.liveText = frame.liveText }
                 if let execution = frame.execution { agent.execution = execution }
                 if let state = frame.state { agent.state = state }
                 if let connection = frame.connection { agent.connection = connection }
                 if let canStop = frame.canStop { agent.canStop = canStop }
             }
-            if frame.agentId == selectedId { scheduleRefresh() }
-        case "stream":
-            socketNote = "live"
-            updateAgent(frame.agentId) { agent in
-                agent.liveText = frame.liveText
-                if let execution = frame.execution { agent.execution = execution }
-            }
-        default:
-            break
         }
     }
 
@@ -293,7 +349,7 @@ final class AppModel {
         do {
             try await client.send(agentId: agent.id, text: trimmed, id: UUID().uuidString, mode: nil)
             drafts[agent.id] = ""
-            scheduleRefresh()
+            scheduleRefresh(after: .milliseconds(150))
         } catch {
             actionError = error.localizedDescription
         }
@@ -302,7 +358,7 @@ final class AppModel {
     func cancelQueued(id: String) async {
         do {
             try await client.cancel(id: id)
-            scheduleRefresh()
+            scheduleRefresh(after: .milliseconds(150))
         } catch {
             actionError = error.localizedDescription
         }
@@ -311,7 +367,7 @@ final class AppModel {
     func retryMessage(id: String) async {
         do {
             try await client.retry(id: id)
-            scheduleRefresh()
+            scheduleRefresh(after: .milliseconds(150))
         } catch {
             actionError = error.localizedDescription
         }
@@ -321,7 +377,7 @@ final class AppModel {
         guard let agent = selectedAgent else { return }
         do {
             try await client.stop(agentId: agent.id)
-            scheduleRefresh()
+            scheduleRefresh(after: .milliseconds(150))
         } catch {
             actionError = error.localizedDescription
         }
@@ -330,7 +386,7 @@ final class AppModel {
     func checkRunners() async {
         do {
             try await client.refreshConnections()
-            scheduleRefresh()
+            scheduleRefresh(after: .milliseconds(150))
         } catch {
             actionError = error.localizedDescription
         }
@@ -361,6 +417,8 @@ final class AppModel {
         pollTask?.cancel()
         pollTask = nil
         debounceTask?.cancel()
+        streamFlushTask?.cancel()
+        pendingFrames.removeAll()
         socketGeneration += 1
         socketTask?.cancel(with: .goingAway, reason: nil)
         socketTask = nil
@@ -368,6 +426,7 @@ final class AppModel {
         KeychainStore.delete()
         UserDefaults.standard.removeObject(forKey: "teamroom.baseURL")
         agents = []
+        items = []
         selectedId = ""
         drafts = [:]
         eventCache = [:]

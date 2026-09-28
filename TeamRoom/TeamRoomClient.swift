@@ -114,6 +114,11 @@ actor TeamRoomClient {
         return try await perform(get(url), as: EventDetail.self)
     }
 
+    func media(agentId: String, id: String) async throws -> Data {
+        let url = try endpoint("/api/media", query: ["agentId": agentId, "id": id])
+        return try await data(for: get(url))
+    }
+
     // MARK: - Live socket
 
     func makeWebSocketRequest() throws -> URLRequest {

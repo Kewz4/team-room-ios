@@ -1,68 +1,90 @@
 import SwiftUI
 
-enum StreamRow: Identifiable {
-    case message(ChatMessage)
-    case event(LiveEvent)
-
-    var id: String {
-        switch self {
-        case .message(let message): return "m-" + message.id
-        case .event(let event): return "e-" + event.id
-        }
-    }
-
-    var time: Date? {
-        switch self {
-        case .message(let message): return TimeFormat.date(message.time)
-        case .event(let event): return TimeFormat.date(event.time)
-        }
-    }
-}
-
 struct ConversationView: View {
     @Environment(AppModel.self) private var model
     @Binding var selectedEvent: LiveEvent?
+    @State private var atBottom = true
 
     private let bottomID = "conversation-bottom"
 
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 12) {
-                    if let agent = model.selectedAgent {
-                        ForEach(rows(for: agent)) { row in
-                            switch row {
-                            case .message(let message):
-                                MessageRow(message: message)
-                            case .event(let event):
-                                EventRow(event: event) { selectedEvent = event }
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    if model.items.isEmpty {
+                        emptyState
+                    }
+                    ForEach(model.items) { item in
+                        switch item {
+                        case .message(let message):
+                            MessageRow(agentId: model.selectedId, message: message)
+                        case .activity(let group):
+                            ActivityGroupRow(agentId: model.selectedId, group: group) { event in
+                                selectedEvent = event
                             }
                         }
-                        QueueSection(agent: agent)
-                        if let live = agent.liveText, !live.isEmpty {
-                            LiveReplyRow(text: live)
-                        }
-                    } else {
-                        ContentUnavailableView("No teammate selected", systemImage: "person.2")
+                    }
+                    QueueSection(agentId: model.selectedId)
+                    if let live = model.selectedAgent?.liveText, !live.isEmpty {
+                        LiveTextRow(text: live)
                     }
                     Color.clear
                         .frame(height: 1)
                         .id(bottomID)
                 }
-                .padding(.horizontal, 12)
-                .padding(.top, 10)
-                .padding(.bottom, 6)
+                .padding(.horizontal, Tokens.Space.m)
+                .padding(.top, Tokens.Space.s)
+                .padding(.bottom, Tokens.Space.m)
             }
+            .defaultScrollAnchor(.bottom)
             .scrollDismissesKeyboard(.interactively)
+            .onScrollGeometryChange(for: Bool.self) { geometry in
+                geometry.contentSize.height - geometry.contentOffset.y - geometry.containerSize.height < 160
+            } action: { _, value in
+                atBottom = value
+            }
             .onChange(of: scrollTick) { _, _ in
-                withAnimation(.easeOut(duration: 0.2)) {
+                guard atBottom else { return }
+                withAnimation(.easeOut(duration: 0.18)) {
                     proxy.scrollTo(bottomID, anchor: .bottom)
                 }
             }
-            .onAppear {
-                proxy.scrollTo(bottomID, anchor: .bottom)
+            .overlay(alignment: .bottomTrailing) {
+                if !atBottom {
+                    Button {
+                        withAnimation(.snappy(duration: 0.25)) {
+                            proxy.scrollTo(bottomID, anchor: .bottom)
+                        }
+                        atBottom = true
+                    } label: {
+                        Image(systemName: "arrow.down")
+                            .font(.system(size: 15, weight: .semibold))
+                            .frame(width: 38, height: 38)
+                    }
+                    .buttonStyle(.plain)
+                    .glassEffect(.regular.interactive(), in: Circle())
+                    .padding(.trailing, Tokens.Space.m)
+                    .padding(.bottom, Tokens.Space.s)
+                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                    .accessibilityLabel("Scroll to latest")
+                }
+            }
+            .animation(.snappy(duration: 0.2), value: atBottom)
+        }
+    }
+
+    private var emptyState: some View {
+        VStack(alignment: .leading, spacing: Tokens.Space.xs) {
+            Text(model.selectedAgent == nil ? "Pick a teammate" : "No conversation yet")
+                .font(TypeScale.subhead)
+                .foregroundStyle(Tokens.textSecondary)
+            if let label = model.selectedAgent?.label {
+                Text("Send the first message to \(label) from the composer below.")
+                    .font(TypeScale.caption)
+                    .foregroundStyle(Tokens.textTertiary)
             }
         }
+        .padding(.vertical, Tokens.Space.l)
     }
 
     private var scrollTick: String {
@@ -72,83 +94,213 @@ struct ConversationView: View {
         let queue = agent.queue?.count ?? 0
         return "\(model.selectedId)-\(messages)-\(live)-\(queue)"
     }
-
-    private func rows(for agent: Agent) -> [StreamRow] {
-        let messages = (agent.messages ?? []).map(StreamRow.message)
-        let events = (agent.events ?? []).map(StreamRow.event)
-        return (messages + events).sorted { ($0.time ?? .distantPast) < ($1.time ?? .distantPast) }
-    }
 }
 
 struct MessageRow: View {
+    let agentId: String
     let message: ChatMessage
 
     private var isUser: Bool { message.role == "user" }
+    private var images: [EventImage] { (message.images ?? []).filter { $0.status == "available" } }
 
     var body: some View {
-        HStack {
-            if isUser { Spacer(minLength: 44) }
-            Text(message.text ?? "")
-                .font(.callout)
-                .textSelection(.enabled)
-                .padding(.horizontal, 13)
-                .padding(.vertical, 9)
-                .background(
-                    isUser ? AnyShapeStyle(Color.green.opacity(0.22)) : AnyShapeStyle(.thinMaterial),
-                    in: RoundedRectangle(cornerRadius: 18)
-                )
-            if !isUser { Spacer(minLength: 44) }
+        if isUser {
+            HStack {
+                Spacer(minLength: 56)
+                VStack(alignment: .trailing, spacing: Tokens.Space.s) {
+                    MarkdownText(text: message.text ?? "")
+                        .padding(.horizontal, Tokens.Space.m)
+                        .padding(.vertical, 10)
+                        .background(Tokens.accentSoft, in: RoundedRectangle(cornerRadius: Tokens.Radius.l, style: .continuous))
+                    imageRow
+                }
+            }
+            .padding(.vertical, Tokens.Space.xs)
+        } else {
+            VStack(alignment: .leading, spacing: Tokens.Space.s) {
+                MarkdownText(text: message.text ?? "")
+                imageRow
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, Tokens.Space.s)
         }
-        .frame(maxWidth: .infinity, alignment: isUser ? .trailing : .leading)
+    }
+
+    @ViewBuilder private var imageRow: some View {
+        if !images.isEmpty {
+            HStack(spacing: Tokens.Space.s) {
+                ForEach(images) { image in
+                    RemoteImage(agentId: agentId, image: image)
+                }
+            }
+        }
+    }
+}
+
+struct ActivityGroupRow: View {
+    let agentId: String
+    let group: ActivityGroup
+    let onSelectEvent: (LiveEvent) -> Void
+    @State private var expanded = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.snappy(duration: 0.2)) {
+                    expanded.toggle()
+                }
+            } label: {
+                HStack(spacing: Tokens.Space.s) {
+                    statusGlyph
+                    Text(group.summary)
+                        .font(TypeScale.captionMedium)
+                        .foregroundStyle(Tokens.textSecondary)
+                    Spacer(minLength: Tokens.Space.s)
+                    Text(TimeFormat.relative(group.lastTime))
+                        .font(TypeScale.caption)
+                        .foregroundStyle(Tokens.textTertiary)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(Tokens.textTertiary)
+                        .rotationEffect(.degrees(expanded ? 90 : 0))
+                }
+                .padding(.vertical, 10)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if expanded {
+                HStack(alignment: .top, spacing: Tokens.Space.m) {
+                    Rectangle()
+                        .fill(Tokens.hairline)
+                        .frame(width: 1)
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(group.events) { event in
+                            ActivityEventRow(agentId: agentId, event: event) {
+                                onSelectEvent(event)
+                            }
+                        }
+                    }
+                }
+                .padding(.bottom, Tokens.Space.s)
+            }
+        }
+    }
+
+    @ViewBuilder private var statusGlyph: some View {
+        if group.running {
+            ProgressView()
+                .controlSize(.mini)
+                .tint(Tokens.working)
+                .frame(width: 14)
+        } else if group.failed {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Tokens.failure)
+                .frame(width: 14)
+        } else {
+            Image(systemName: "checkmark")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Tokens.textTertiary)
+                .frame(width: 14)
+        }
+    }
+}
+
+struct ActivityEventRow: View {
+    let agentId: String
+    let event: LiveEvent
+    let onTap: () -> Void
+
+    private var images: [EventImage] {
+        (event.images ?? []).filter { $0.status == "available" }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Tokens.Space.xs) {
+            Button(action: onTap) {
+                HStack(spacing: Tokens.Space.s) {
+                    Image(systemName: EventStyle.symbol(for: event))
+                        .font(.system(size: 11))
+                        .foregroundStyle(EventStyle.color(for: event))
+                        .frame(width: 16)
+                    Text(ConversationBuilder.displayTitle(for: event))
+                        .font(TypeScale.caption)
+                        .foregroundStyle(Tokens.textSecondary)
+                        .lineLimit(1)
+                    Spacer(minLength: Tokens.Space.xs)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(Tokens.textTertiary)
+                }
+                .padding(.vertical, 6)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(event.title)
+
+            if !images.isEmpty {
+                HStack(spacing: Tokens.Space.s) {
+                    ForEach(images) { image in
+                        RemoteImage(agentId: agentId, image: image)
+                    }
+                }
+                .padding(.bottom, Tokens.Space.xs)
+            }
+        }
     }
 }
 
 struct QueueSection: View {
     @Environment(AppModel.self) private var model
-    let agent: Agent
+    let agentId: String
 
     var body: some View {
-        let items = (agent.queue ?? []).filter { ($0.text ?? "").isEmpty == false }
+        let items = (model.selectedAgent?.queue ?? []).filter { ($0.text ?? "").isEmpty == false }
         if !items.isEmpty {
-            VStack(alignment: .trailing, spacing: 8) {
+            VStack(alignment: .trailing, spacing: Tokens.Space.s) {
                 ForEach(items) { item in
                     HStack {
-                        Spacer(minLength: 44)
-                        VStack(alignment: .trailing, spacing: 6) {
+                        Spacer(minLength: 56)
+                        VStack(alignment: .trailing, spacing: Tokens.Space.xs) {
                             Text(item.text ?? "")
-                                .font(.callout)
-                                .padding(.horizontal, 13)
-                                .padding(.vertical, 9)
-                                .background(Color.green.opacity(0.14), in: RoundedRectangle(cornerRadius: 18))
-                            HStack(spacing: 10) {
+                                .font(TypeScale.body)
+                                .foregroundStyle(Tokens.textPrimary)
+                                .padding(.horizontal, Tokens.Space.m)
+                                .padding(.vertical, 10)
+                                .background(Tokens.accentSoft.opacity(0.65), in: RoundedRectangle(cornerRadius: Tokens.Radius.l, style: .continuous))
+                            HStack(spacing: Tokens.Space.m) {
                                 Text(queueLabel(item))
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
+                                    .font(TypeScale.caption)
+                                    .foregroundStyle(Tokens.textTertiary)
                                 if canCancel(item) {
                                     Button("Cancel") {
                                         Task { await model.cancelQueued(id: item.id) }
                                     }
-                                    .font(.caption2)
+                                    .font(TypeScale.captionMedium)
+                                    .foregroundStyle(Tokens.textSecondary)
                                 }
                                 if canRetry(item) {
                                     Button("Retry") {
                                         Task { await model.retryMessage(id: item.id) }
                                     }
-                                    .font(.caption2)
+                                    .font(TypeScale.captionMedium)
+                                    .foregroundStyle(Tokens.accent)
                                 }
                             }
                         }
                     }
                 }
             }
+            .padding(.vertical, Tokens.Space.xs)
         }
     }
 
     private func queueLabel(_ item: ChatMessage) -> String {
         switch item.state {
         case "queued": return "Queued"
-        case "waiting_busy": return "Waiting for the current turn to finish"
-        case "waiting_connection": return "Waiting for the runner connection"
+        case "waiting_busy": return "Waiting for the current turn"
+        case "waiting_connection": return "Waiting for the runner"
         case "sending": return "Sending…"
         case "streaming": return "Working…"
         case "failed": return "Failed — \(item.error ?? "unknown error")"
@@ -166,22 +318,17 @@ struct QueueSection: View {
     }
 }
 
-struct LiveReplyRow: View {
+struct LiveTextRow: View {
     let text: String
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: 8) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(text)
-                    .font(.callout)
-                    .textSelection(.enabled)
-                BlinkingDot()
-            }
-            .padding(.horizontal, 13)
-            .padding(.vertical, 9)
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18))
-            Spacer(minLength: 44)
+        VStack(alignment: .leading, spacing: Tokens.Space.s) {
+            MarkdownText(text: text)
+            BlinkingDot()
+                .foregroundStyle(Tokens.working)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, Tokens.Space.s)
     }
 }
 
@@ -190,46 +337,10 @@ struct BlinkingDot: View {
 
     var body: some View {
         Circle()
-            .frame(width: 7, height: 7)
+            .frame(width: 6, height: 6)
             .opacity(dim ? 0.25 : 1)
             .animation(.easeInOut(duration: 0.65).repeatForever(autoreverses: true), value: dim)
             .onAppear { dim = true }
-    }
-}
-
-struct EventRow: View {
-    let event: LiveEvent
-    let onTap: () -> Void
-
-    var body: some View {
-        Button(action: onTap) {
-            HStack(alignment: .top, spacing: 8) {
-                Image(systemName: EventStyle.symbol(for: event))
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(EventStyle.color(for: event))
-                    .frame(width: 16, height: 16)
-                    .padding(.top, 2)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(event.title)
-                        .font(.caption.weight(.medium))
-                        .lineLimit(1)
-                    if let preview = event.detailPreview, !preview.isEmpty {
-                        Text(preview.replacingOccurrences(of: "\r", with: ""))
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
-                    }
-                }
-                Spacer(minLength: 6)
-                Text(TimeFormat.relative(event.time))
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
-        }
-        .buttonStyle(.plain)
     }
 }
 
@@ -250,9 +361,9 @@ enum EventStyle {
     }
 
     static func color(for event: LiveEvent) -> Color {
-        if event.status == "failed" || event.kind == "error" { return .red }
-        if event.status == "running" { return .orange }
-        return .secondary
+        if event.status == "failed" || event.kind == "error" { return Tokens.failure }
+        if event.status == "running" { return Tokens.working }
+        return Tokens.textSecondary
     }
 }
 
@@ -263,33 +374,62 @@ struct EventDetailSheet: View {
     let event: LiveEvent
     @State private var detail: EventDetail?
 
+    private var images: [EventImage] {
+        ((detail?.images ?? event.images) ?? []).filter { $0.status == "available" }
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(event.title)
-                        .font(.headline)
-                    HStack(spacing: 8) {
-                        Text(event.kind)
-                        if let status = event.status { Text(status) }
-                        if let time = TimeFormat.date(event.time) {
-                            Text(time.formatted(date: .abbreviated, time: .standard))
+                VStack(alignment: .leading, spacing: Tokens.Space.m) {
+                    VStack(alignment: .leading, spacing: Tokens.Space.xs) {
+                        Text(ConversationBuilder.displayTitle(for: event))
+                            .font(TypeScale.title)
+                            .foregroundStyle(Tokens.textPrimary)
+                        HStack(spacing: Tokens.Space.s) {
+                            Text(event.kind)
+                            if let status = event.status { Text(status) }
+                            if let time = TimeFormat.date(event.time) {
+                                Text(time.formatted(date: .abbreviated, time: .standard))
+                            }
+                        }
+                        .font(TypeScale.caption)
+                        .foregroundStyle(Tokens.textSecondary)
+                    }
+
+                    if !images.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: Tokens.Space.s) {
+                                ForEach(images) { image in
+                                    RemoteImage(agentId: agentId, image: image, side: 120)
+                                }
+                            }
                         }
                     }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    if let text = detail?.detail ?? event.detailPreview, !text.isEmpty {
-                        Text(text)
-                            .font(.system(.footnote, design: .monospaced))
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    } else {
+
+                    let raw = detail?.detail ?? event.detailPreview ?? ""
+                    if raw.isEmpty && detail == nil {
                         ProgressView()
                             .frame(maxWidth: .infinity)
+                            .padding(.vertical, Tokens.Space.l)
+                    } else {
+                        ForEach(OutputSections.build(raw)) { section in
+                            VStack(alignment: .leading, spacing: Tokens.Space.xs) {
+                                Text(section.label)
+                                    .font(TypeScale.captionMedium)
+                                    .foregroundStyle(Tokens.textTertiary)
+                                CodeText(
+                                    text: section.text,
+                                    collapsible: true,
+                                    tint: section.kind == .error ? Tokens.failure : nil
+                                )
+                            }
+                        }
                     }
                 }
-                .padding(16)
+                .padding(Tokens.Space.m)
             }
+            .background(Tokens.background)
             .navigationTitle("Activity detail")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

@@ -5,41 +5,43 @@ struct ComposerView: View {
     @FocusState private var focused: Bool
 
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: Tokens.Space.s) {
             if model.selectedAgent?.canStop == true {
                 Button(role: .destructive) {
                     Task { await model.stopTurn() }
                 } label: {
                     Label("Stop this turn", systemImage: "stop.circle")
-                        .font(.caption.weight(.semibold))
+                        .font(TypeScale.captionMedium)
                 }
                 .buttonStyle(.bordered)
-                .tint(.red)
+                .tint(Tokens.failure)
                 .frame(maxWidth: .infinity, alignment: .trailing)
             }
-            HStack(alignment: .bottom, spacing: 8) {
+            HStack(alignment: .bottom, spacing: Tokens.Space.s) {
                 TextField(placeholder, text: draft, axis: .vertical)
+                    .font(TypeScale.body)
                     .lineLimit(1...6)
                     .focused($focused)
-                    .padding(.horizontal, 14)
+                    .padding(.horizontal, Tokens.Space.m)
                     .padding(.vertical, 10)
-                    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 21))
+                    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 21, style: .continuous))
                 Button {
                     Task { await model.send(draft.wrappedValue) }
                 } label: {
                     Image(systemName: "arrow.up")
-                        .font(.headline)
+                        .font(.system(size: 16, weight: .semibold))
                         .frame(width: 42, height: 42)
                 }
                 .buttonStyle(.glassProminent)
+                .tint(Tokens.accent)
                 .clipShape(Circle())
                 .disabled(!canSend)
-                .opacity(canSend ? 1 : 0.55)
+                .opacity(canSend ? 1 : 0.5)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.top, 6)
-        .padding(.bottom, 6)
+        .padding(.horizontal, Tokens.Space.m)
+        .padding(.top, Tokens.Space.s)
+        .padding(.bottom, Tokens.Space.s)
     }
 
     private var draft: Binding<String> {

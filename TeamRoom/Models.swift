@@ -42,6 +42,7 @@ struct ChatMessage: Codable, Hashable, Identifiable {
     var state: String?
     var error: String?
     var retriedAs: String?
+    var images: [EventImage]?
 }
 
 struct LiveEvent: Codable, Hashable, Identifiable {
@@ -55,6 +56,7 @@ struct LiveEvent: Codable, Hashable, Identifiable {
     var detailPreview: String?
     var detailVersion: Int?
     var agentId: String?
+    var images: [EventImage]?
 }
 
 struct EventImage: Codable, Hashable, Identifiable {

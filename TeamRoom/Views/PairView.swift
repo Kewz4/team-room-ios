@@ -6,52 +6,74 @@ struct PairView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: Tokens.Space.l) {
+                VStack(alignment: .leading, spacing: Tokens.Space.xs) {
                     Text("Team Room")
-                        .font(.largeTitle.bold())
+                        .font(TypeScale.screenTitle)
+                        .foregroundStyle(Tokens.textPrimary)
                     Text("Your private console for the local AI teammates, now native on iPhone.")
-                        .foregroundStyle(.secondary)
+                        .font(TypeScale.body)
+                        .foregroundStyle(Tokens.textSecondary)
                 }
 
-                VStack(alignment: .leading, spacing: 10) {
-                    Label("On the PC, open Team Room → Connection settings → Create device link.", systemImage: "1.circle")
-                    Label("Copy the link and paste it here within 30 minutes. Each link works once.", systemImage: "2.circle")
-                    Label("The session is kept in your iPhone Keychain; nothing is stored in the repo.", systemImage: "3.circle")
+                VStack(alignment: .leading, spacing: Tokens.Space.s) {
+                    step(1, "On the PC, open Team Room → Connection settings → Create device link.")
+                    step(2, "Copy the link and paste it below within 30 minutes. Each link works once.")
+                    step(3, "The session is kept in your iPhone Keychain; nothing is stored in the repo.")
                 }
-                .font(.footnote)
-                .foregroundStyle(.secondary)
 
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: Tokens.Space.s) {
                     TextField("https://….trycloudflare.com/#pair=…", text: $input, axis: .vertical)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .keyboardType(.URL)
-                        .font(.footnote.monospaced())
-                        .padding(12)
-                        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14))
+                        .font(TypeScale.mono)
+                        .padding(Tokens.Space.m)
+                        .background(Tokens.surface, in: RoundedRectangle(cornerRadius: Tokens.Radius.m, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Tokens.Radius.m, style: .continuous)
+                                .stroke(Tokens.hairline, lineWidth: 0.5)
+                        )
 
                     Button {
                         Task { await model.pair(input) }
                     } label: {
                         HStack {
                             Spacer()
-                            if model.pairingBusy { ProgressView().controlSize(.small) }
-                            Text("Connect")
+                            if model.pairingBusy {
+                                ProgressView().controlSize(.small)
+                            }
+                            Text("Connect").font(TypeScale.subhead)
                             Spacer()
                         }
+                        .frame(height: 44)
                     }
                     .buttonStyle(.glassProminent)
+                    .tint(Tokens.accent)
                     .disabled(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.pairingBusy)
                 }
 
                 if let error = model.pairingError {
                     Text(error)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
+                        .font(TypeScale.caption)
+                        .foregroundStyle(Tokens.failure)
                 }
             }
-            .padding(22)
+            .padding(Tokens.Space.l)
+        }
+        .background(Tokens.background)
+    }
+
+    private func step(_ number: Int, _ text: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: Tokens.Space.s) {
+            Text("\(number)")
+                .font(TypeScale.captionMedium)
+                .foregroundStyle(Tokens.accent)
+                .frame(width: 20, height: 20)
+                .background(Tokens.accentSoft, in: Circle())
+            Text(text)
+                .font(TypeScale.caption)
+                .foregroundStyle(Tokens.textSecondary)
         }
     }
 }

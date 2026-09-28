@@ -3,12 +3,17 @@ import SwiftUI
 @main
 struct TeamRoomApp: App {
     @State private var model = AppModel()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environment(model)
+                .tint(Tokens.accent)
                 .task { await model.boot() }
+                .onChange(of: scenePhase) { _, phase in
+                    model.sceneChanged(phase == .active)
+                }
         }
     }
 }
@@ -22,12 +27,14 @@ struct RootView: View {
             case .pairing:
                 PairView()
             case .connecting:
-                VStack(spacing: 14) {
+                VStack(spacing: Tokens.Space.m) {
                     ProgressView()
                     Text("Connecting to the team room…")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
+                        .font(TypeScale.caption)
+                        .foregroundStyle(Tokens.textSecondary)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Tokens.background)
             case .ready:
                 RoomView()
             }
