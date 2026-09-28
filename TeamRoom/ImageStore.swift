@@ -23,7 +23,7 @@ final class ImageStore {
             do {
                 let data = try await client.media(agentId: agentId, id: id)
                 guard let image = UIImage(data: data) else { return nil }
-                return image.byPreparingThumbnail(ofSize: CGSize(width: 1600, height: 1600)) ?? image
+                return await image.byPreparingThumbnail(ofSize: CGSize(width: 1600, height: 1600)) ?? image
             } catch {
                 return nil
             }

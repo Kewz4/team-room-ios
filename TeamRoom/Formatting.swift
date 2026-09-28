@@ -88,9 +88,9 @@ enum MarkdownBlocks {
                 continue
             }
 
-            if let numbered = numbered(trimmed) {
+            if let firstNumbered = numbered(trimmed) {
                 flushParagraph()
-                var number = numbered.number
+                var number = firstNumbered.number
                 while i < lines.count, let item = numbered(lines[i].trimmingCharacters(in: .whitespaces)) {
                     blocks.append(Block(id: blocks.count, kind: .numbered(number), text: item.text))
                     number += 1
