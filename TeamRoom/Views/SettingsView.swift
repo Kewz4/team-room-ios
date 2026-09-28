@@ -86,8 +86,11 @@ struct SettingsView: View {
 
     private func usageLine(_ agent: Agent) -> String {
         var parts: [String] = []
-        if let weekly = agent.usage?.weekly { parts.append("Weekly \(Int(weekly))% used") }
-        if let fiveHour = agent.usage?.fiveHour { parts.append("Five-hour \(Int(fiveHour))%") }
+        if let fiveHour = agent.usage?.fiveHour { parts.append("5-hour \(Int(fiveHour))%") }
+        if let weekly = agent.usage?.weekly { parts.append("Weekly \(Int(weekly))%") }
+        if let reset = agent.usage?.resetAt, let date = TimeFormat.date(reset) {
+            parts.append("weekly resets \(date.formatted(date: .abbreviated, time: .shortened))")
+        }
         if parts.isEmpty { parts.append("Usage not reported") }
         if let source = agent.usage?.source, !source.isEmpty { parts.append(source) }
         return parts.joined(separator: " · ")

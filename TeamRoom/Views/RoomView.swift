@@ -178,24 +178,32 @@ struct WorkerRow: View {
                     Circle()
                         .fill(stateColor)
                         .frame(width: 6, height: 6)
+                    if selected {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(Tokens.accent)
+                    }
                 }
                 Text("\(agent.account ?? "") · \(agent.modelLabel ?? "")")
                     .font(TypeScale.caption)
                     .foregroundStyle(Tokens.textSecondary)
+                    .lineLimit(1)
                 Text(statusLine)
                     .font(TypeScale.caption)
                     .foregroundStyle(Tokens.textTertiary)
                     .lineLimit(1)
             }
             Spacer(minLength: Tokens.Space.s)
-            if selected {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Tokens.accent)
+            if hasUsage {
+                UsageBars(usage: agent.usage)
             }
         }
         .padding(.vertical, Tokens.Space.xs)
         .contentShape(Rectangle())
+    }
+
+    private var hasUsage: Bool {
+        agent.usage?.fiveHour != nil || agent.usage?.weekly != nil
     }
 
     private var statusLine: String {
@@ -204,7 +212,6 @@ struct WorkerRow: View {
         case "working":
             return agent.execution?.label ?? "Working"
         case "idle":
-            if let weekly = agent.usage?.weekly { return "Idle · \(Int(weekly))% weekly used" }
             return "Idle"
         default:
             return "Activity unknown"
@@ -217,6 +224,49 @@ struct WorkerRow: View {
         case "idle": return Tokens.idle
         default: return Tokens.textTertiary
         }
+    }
+}
+
+/// Compact per-window usage: a 5-hour bar and a weekly bar, colored by pressure.
+struct UsageBars: View {
+    let usage: AgentUsage?
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 3) {
+            if let fiveHour = usage?.fiveHour {
+                bar(label: "5h", value: fiveHour)
+            }
+            if let weekly = usage?.weekly {
+                bar(label: "wk", value: weekly)
+            }
+        }
+    }
+
+    private func bar(label: String, value: Double) -> some View {
+        HStack(spacing: Tokens.Space.xs) {
+            Text(label)
+                .font(.system(size: 10))
+                .foregroundStyle(Tokens.textTertiary)
+                .frame(width: 14, alignment: .trailing)
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Tokens.surfaceAlt)
+                    .frame(width: 44, height: 4)
+                Capsule()
+                    .fill(color(value))
+                    .frame(width: max(3, 44 * min(max(value, 0), 100) / 100), height: 4)
+            }
+            Text("\(Int(value.rounded()))%")
+                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                .foregroundStyle(Tokens.textSecondary)
+                .frame(width: 30, alignment: .trailing)
+        }
+    }
+
+    private func color(_ value: Double) -> Color {
+        if value >= 95 { return Tokens.failure }
+        if value >= 80 { return Tokens.working }
+        return Tokens.accent
     }
 }
 

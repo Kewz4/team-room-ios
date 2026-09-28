@@ -38,7 +38,8 @@ link and paste it again; the app re-pairs in place.
 
 ## What it does today (v0.2)
 
-- Hamburger teammate drawer with brand icons (DeepSeek / OpenAI / Claude), state dots and weekly usage.
+- Hamburger teammate drawer with brand icons (DeepSeek / OpenAI / Claude), state dots, and usage-window bars
+  (5-hour + weekly, colored by pressure) wherever the server reports them.
 - Real conversation view: transcript messages, live streaming reply text, and compact **activity dropdowns**
   ("Used 2 tools, ran 3 commands ›") that expand into one-line tool rows with full detail sheets.
 - Inline image previews from `/api/media` (cookie-authenticated, downsampled, bounded cache) with a full-screen viewer.
