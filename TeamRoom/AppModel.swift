@@ -20,6 +20,7 @@ final class AppModel {
     var drafts: [String: String] = [:]
     var actionError: String?
     var sending = false
+    var promptBusy: Set<String> = []
 
     let client = TeamRoomClient()
     let images: ImageStore
@@ -386,6 +387,18 @@ final class AppModel {
     func checkRunners() async {
         do {
             try await client.refreshConnections()
+            scheduleRefresh(after: .milliseconds(150))
+        } catch {
+            actionError = error.localizedDescription
+        }
+    }
+
+    func respond(to prompt: AgentPrompt, answer: PromptAnswer) async {
+        guard let agent = selectedAgent, !promptBusy.contains(prompt.id) else { return }
+        promptBusy.insert(prompt.id)
+        defer { promptBusy.remove(prompt.id) }
+        do {
+            try await client.respond(agentId: agent.id, promptId: prompt.id, answer: answer)
             scheduleRefresh(after: .milliseconds(150))
         } catch {
             actionError = error.localizedDescription

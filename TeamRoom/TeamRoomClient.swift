@@ -109,6 +109,15 @@ actor TeamRoomClient {
         try await perform(post(try endpoint("/api/device-link"), Empty()), as: DeviceLink.self)
     }
 
+    func respond(agentId: String, promptId: String, answer: PromptAnswer) async throws {
+        struct Body: Codable {
+            var agentId: String
+            var promptId: String
+            var answer: PromptAnswer
+        }
+        _ = try await data(for: post(try endpoint("/api/prompt-response"), Body(agentId: agentId, promptId: promptId, answer: answer)))
+    }
+
     func eventDetail(agentId: String, id: String) async throws -> EventDetail {
         let url = try endpoint("/api/event", query: ["agentId": agentId, "id": id])
         return try await perform(get(url), as: EventDetail.self)

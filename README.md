@@ -43,6 +43,11 @@ link and paste it again; the app re-pairs in place.
 - Real conversation view: transcript messages, live streaming reply text, and compact **activity dropdowns**
   ("Used 2 tools, ran 3 commands ›") that expand into one-line tool rows with full detail sheets.
 - Inline image previews from `/api/media` (cookie-authenticated, downsampled, bounded cache) with a full-screen viewer.
+- **Decision cards**: when a Codex teammate asks a question (one or many), requests a command/file approval, or asks
+  for extra sandbox permissions, a card pins above the composer — options, free-text "other", approve/deny, allow-once
+  vs allow-session — and the answer travels back through the bridge (`POST /api/prompt-response`).
+  Claude CLI (`--input-format stream-json` + `--permission-prompts`) and OpenCode (`permission.asked` /
+  `question.asked` are already forwarded) answering paths are the next providers to wire.
 - Scroll-to-bottom control that appears when you scroll back through history.
 - Delivery queue with states (queued, waiting for busy/connection), cancel, retry, and **Stop this turn**.
 - Live updates over `/live` WebSocket (coalesced frames) with a slow safety poll; polling pauses in the background.

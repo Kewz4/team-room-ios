@@ -10,9 +10,17 @@ struct RoomView: View {
         NavigationStack {
             ConversationView(selectedEvent: $selectedEvent)
                 .background(Tokens.background)
-                .safeAreaInset(edge: .bottom, spacing: 0) {
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                VStack(spacing: 0) {
+                    if let agent = model.selectedAgent, let prompt = agent.prompts?.first {
+                        DecisionCard(agentId: agent.id, prompt: prompt, extraCount: (agent.prompts?.count ?? 1) - 1)
+                            .id(prompt.id)
+                            .padding(.horizontal, Tokens.Space.m)
+                            .padding(.bottom, Tokens.Space.s)
+                    }
                     ComposerView()
                 }
+            }
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
@@ -73,7 +81,9 @@ struct RoomView: View {
     private var headerSubtitle: String {
         guard let agent = model.selectedAgent else { return "not connected" }
         let state: String
-        if agent.connection?.ready == false {
+        if agent.prompts?.isEmpty == false {
+            state = "needs your input"
+        } else if agent.connection?.ready == false {
             state = "connection needed"
         } else if agent.state == "working" {
             state = agent.execution?.label ?? "working"
@@ -190,7 +200,7 @@ struct WorkerRow: View {
                     .lineLimit(1)
                 Text(statusLine)
                     .font(TypeScale.caption)
-                    .foregroundStyle(Tokens.textTertiary)
+                    .foregroundStyle(agent.prompts?.isEmpty == false ? Tokens.working : Tokens.textTertiary)
                     .lineLimit(1)
             }
             Spacer(minLength: Tokens.Space.s)
@@ -207,6 +217,7 @@ struct WorkerRow: View {
     }
 
     private var statusLine: String {
+        if agent.prompts?.isEmpty == false { return "Waiting for your input" }
         if agent.connection?.ready == false { return "Runner not connected" }
         switch agent.state {
         case "working":

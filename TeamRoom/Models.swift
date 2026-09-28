@@ -78,6 +78,47 @@ struct EventDetail: Codable, Hashable {
     var images: [EventImage]?
 }
 
+struct PromptOption: Codable, Hashable, Identifiable {
+    var id: String { label }
+    var label: String
+    var description: String?
+}
+
+struct PromptQuestion: Codable, Hashable, Identifiable {
+    var id: String
+    var header: String?
+    var question: String
+    var isOther: Bool?
+    var isSecret: Bool?
+    var options: [PromptOption]?
+}
+
+/// A pending decision from a teammate: a question, command/file approval, or permission request.
+struct AgentPrompt: Codable, Hashable, Identifiable {
+    var id: String
+    var kind: String
+    var title: String?
+    var detail: String?
+    var command: String?
+    var cwd: String?
+    var reason: String?
+    var createdAt: String?
+    var allowSession: Bool?
+    var questions: [PromptQuestion]?
+}
+
+struct PromptAnswerValue: Codable, Hashable {
+    var answers: [String]
+}
+
+struct PromptAnswer: Codable {
+    var decision: String? = nil
+    var scope: String? = nil
+    var deny: Bool? = nil
+    var decline: Bool? = nil
+    var answers: [String: PromptAnswerValue]? = nil
+}
+
 struct Agent: Codable, Hashable, Identifiable {
     var id: String
     var label: String
@@ -100,6 +141,7 @@ struct Agent: Codable, Hashable, Identifiable {
     var queue: [ChatMessage]?
     var messages: [ChatMessage]?
     var events: [LiveEvent]?
+    var prompts: [AgentPrompt]?
     var loading: Bool?
     var error: String?
 }
