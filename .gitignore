@@ -1,0 +1,6 @@
+.DS_Store
+TeamRoom.xcodeproj/
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/

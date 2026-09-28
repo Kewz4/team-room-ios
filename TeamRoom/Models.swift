@@ -1,0 +1,171 @@
+import Foundation
+
+struct AgentUsage: Codable, Hashable {
+    var activity: String?
+    var weekly: Double?
+    var fiveHour: Double?
+    var updatedAt: String?
+    var source: String?
+    var resetAt: String?
+}
+
+struct AgentConnection: Codable, Hashable {
+    var ready: Bool
+    var reason: String?
+    var checkedAt: String?
+}
+
+struct ExecutionChild: Codable, Hashable, Identifiable {
+    var id: String
+    var label: String?
+    var state: String
+    var updatedAt: String?
+}
+
+struct Execution: Codable, Hashable {
+    var phase: String?
+    var label: String?
+    var since: String?
+    var children: [ExecutionChild]?
+}
+
+/// Transcript message or hub delivery-queue item; the optional fields cover both shapes.
+struct ChatMessage: Codable, Hashable, Identifiable {
+    var id: String
+    var role: String?
+    var text: String?
+    var time: String?
+    var agentId: String?
+    var createdAt: String?
+    var sentAt: String?
+    var completedAt: String?
+    var state: String?
+    var error: String?
+    var retriedAs: String?
+}
+
+struct LiveEvent: Codable, Hashable, Identifiable {
+    var id: String
+    var kind: String
+    var title: String
+    var time: String?
+    var updatedAt: String?
+    var status: String?
+    var action: String?
+    var detailPreview: String?
+    var detailVersion: Int?
+    var agentId: String?
+}
+
+struct EventImage: Codable, Hashable, Identifiable {
+    var id: String
+    var label: String?
+    var status: String?
+    var mime: String?
+}
+
+struct EventDetail: Codable, Hashable {
+    var id: String
+    var kind: String?
+    var title: String?
+    var time: String?
+    var updatedAt: String?
+    var status: String?
+    var detail: String?
+    var detailPreview: String?
+    var images: [EventImage]?
+}
+
+struct Agent: Codable, Hashable, Identifiable {
+    var id: String
+    var label: String
+    var account: String?
+    var role: String?
+    var provider: String?
+    var modelLabel: String?
+    var effort: String?
+    var sessionId: String?
+    var state: String?
+    var execution: Execution?
+    var activity: String?
+    var connection: AgentConnection?
+    var usage: AgentUsage?
+    var lastEventAt: String?
+    var source: String?
+    var canStop: Bool?
+    var liveText: String?
+    var turnId: String?
+    var queue: [ChatMessage]?
+    var messages: [ChatMessage]?
+    var events: [LiveEvent]?
+    var loading: Bool?
+    var error: String?
+}
+
+struct StateResponse: Codable {
+    var mediaPreviews: Bool?
+    var revision: Int?
+    var serverTime: String?
+    var startedAt: String?
+    var remoteUrl: String?
+    var freeMemoryGb: Double?
+    var agents: [Agent]
+}
+
+struct HealthResponse: Codable {
+    var ok: Bool?
+    var uiBuild: String?
+    var mediaPreviews: Bool?
+}
+
+struct SessionStatus: Codable {
+    var authenticated: Bool
+    var local: Bool?
+}
+
+struct DeviceLink: Codable {
+    var url: String?
+    var localUrl: String?
+    var expires: Double?
+}
+
+struct ApiError: Codable {
+    var error: String?
+}
+
+struct WsFrame: Codable {
+    var type: String
+    var revision: Int?
+    var agentId: String?
+    var liveText: String?
+    var execution: Execution?
+    var state: String?
+    var connection: AgentConnection?
+    var canStop: Bool?
+}
+
+enum TimeFormat {
+    private static let iso: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    private static let isoPlain: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
+
+    static func date(_ value: String?) -> Date? {
+        guard let value, !value.isEmpty else { return nil }
+        return iso.date(from: value) ?? isoPlain.date(from: value)
+    }
+
+    static func relative(_ value: String?) -> String {
+        guard let date = date(value) else { return "" }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: date, relativeTo: Date())
+    }
+}
