@@ -53,6 +53,8 @@ struct MarkdownText: View {
                     }
                 case .code:
                     CodeText(text: block.text)
+                case .table(let table):
+                    MarkdownTableView(table: table)
                 }
             }
         }
@@ -64,6 +66,65 @@ struct MarkdownText: View {
         case 2: return 20
         case 3: return 18
         default: return 17
+        }
+    }
+}
+
+struct MarkdownTableView: View {
+    let table: MarkdownBlocks.Table
+
+    var body: some View {
+        ScrollView(.horizontal) {
+            VStack(spacing: 0) {
+                row(table.headers, header: true)
+                    .background(Tokens.surfaceAlt)
+                ForEach(Array(table.rows.enumerated()), id: \.offset) { _, cells in
+                    Rectangle().fill(Tokens.hairline).frame(height: 1)
+                    row(cells, header: false)
+                }
+            }
+            .overlay(Rectangle().stroke(Tokens.hairline, lineWidth: 1))
+            .padding(1)
+        }
+        .scrollIndicators(.visible)
+        .accessibilityIdentifier("markdown-table")
+    }
+
+    private func row(_ cells: [String], header: Bool) -> some View {
+        HStack(alignment: .top, spacing: 0) {
+            ForEach(table.headers.indices, id: \.self) { index in
+                Text(MarkdownBlocks.inline(cells[index]))
+                    .font(.system(size: 14, weight: header ? .semibold : .regular))
+                    .foregroundStyle(Tokens.textPrimary)
+                    .textSelection(.enabled)
+                    .multilineTextAlignment(textAlignment(index))
+                    .frame(width: columnWidth(index), alignment: alignment(index))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .accessibilityLabel(header ? cells[index] : "\(table.headers[index]): \(cells[index])")
+            }
+        }
+    }
+
+    private func columnWidth(_ index: Int) -> CGFloat {
+        let longest = ([table.headers[index]] + table.rows.map { $0[index] }).map(\.count).max() ?? 10
+        return min(220, max(110, CGFloat(longest) * 6.5))
+    }
+
+    private func alignment(_ index: Int) -> Alignment {
+        switch table.alignments[index] {
+        case .leading: return .leading
+        case .center: return .center
+        case .trailing: return .trailing
+        }
+    }
+
+    private func textAlignment(_ index: Int) -> TextAlignment {
+        switch table.alignments[index] {
+        case .leading: return .leading
+        case .center: return .center
+        case .trailing: return .trailing
         }
     }
 }

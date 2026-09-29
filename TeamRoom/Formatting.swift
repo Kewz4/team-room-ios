@@ -4,6 +4,12 @@ import SwiftUI
 // MARK: - Markdown blocks
 
 enum MarkdownBlocks {
+    enum ColumnAlignment: Equatable { case leading, center, trailing }
+    struct Table {
+        let headers: [String]
+        let rows: [[String]]
+        let alignments: [ColumnAlignment]
+    }
     struct Block: Identifiable {
         enum Kind {
             case heading(Int)
@@ -12,6 +18,7 @@ enum MarkdownBlocks {
             case numbered(Int)
             case quote
             case code(String?)
+            case table(Table)
         }
 
         let id: Int
@@ -55,6 +62,24 @@ enum MarkdownBlocks {
             if trimmed.isEmpty {
                 flushParagraph()
                 i += 1
+                continue
+            }
+
+            if i + 1 < lines.count, trimmed.contains("|"),
+               let alignments = tableDelimiter(lines[i + 1]),
+               tableCells(trimmed).count == alignments.count {
+                flushParagraph()
+                let headers = tableCells(trimmed)
+                var rows: [[String]] = []
+                i += 2
+                while i < lines.count {
+                    let row = lines[i].trimmingCharacters(in: .whitespaces)
+                    guard !row.isEmpty, row.contains("|"), !row.hasPrefix("```") else { break }
+                    let cells = tableCells(row)
+                    rows.append(Array((cells + Array(repeating: "", count: headers.count)).prefix(headers.count)))
+                    i += 1
+                }
+                blocks.append(Block(id: blocks.count, kind: .table(Table(headers: headers, rows: rows, alignments: alignments)), text: ""))
                 continue
             }
 
@@ -135,6 +160,49 @@ enum MarkdownBlocks {
         let rest = line.dropFirst(digits.count)
         guard rest.hasPrefix(". ") || rest.hasPrefix(") ") else { return nil }
         return (number, String(rest.dropFirst(2)))
+    }
+
+    static func tableCells(_ line: String) -> [String] {
+        let characters = Array(line.trimmingCharacters(in: .whitespaces))
+        var cells: [String] = []
+        var cell = ""
+        var index = 0
+        var codeTicks = 0
+        while index < characters.count {
+            let character = characters[index]
+            if character == "\\", index + 1 < characters.count {
+                index += 1
+                if characters[index] != "|" { cell.append("\\") }
+                cell.append(characters[index])
+            } else if character == "`" {
+                var count = 1
+                while index + count < characters.count, characters[index + count] == "`" { count += 1 }
+                if codeTicks == 0 { codeTicks = count } else if codeTicks == count { codeTicks = 0 }
+                cell += String(repeating: "`", count: count)
+                index += count - 1
+            } else if character == "|", codeTicks == 0 {
+                cells.append(cell.trimmingCharacters(in: .whitespaces))
+                cell = ""
+            } else { cell.append(character) }
+            index += 1
+        }
+        cells.append(cell.trimmingCharacters(in: .whitespaces))
+        if characters.first == "|", cells.first == "" { cells.removeFirst() }
+        if characters.last == "|", cells.last == "" { cells.removeLast() }
+        return cells
+    }
+
+    private static func tableDelimiter(_ line: String) -> [ColumnAlignment]? {
+        let cells = tableCells(line)
+        guard !cells.isEmpty else { return nil }
+        var alignments: [ColumnAlignment] = []
+        for cell in cells {
+            let value = cell.trimmingCharacters(in: .whitespaces)
+            let dashes = value.trimmingCharacters(in: CharacterSet(charactersIn: ":"))
+            guard dashes.count >= 3, dashes.allSatisfy({ $0 == "-" }) else { return nil }
+            alignments.append(value.hasSuffix(":") ? (value.hasPrefix(":") ? .center : .trailing) : .leading)
+        }
+        return alignments
     }
 }
 

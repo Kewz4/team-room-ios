@@ -13,6 +13,7 @@ final class AppModel {
     var agents: [Agent] = []
     var items: [ConversationItem] = []
     var selectedId = ""
+    var scrollRequest = 0
     var revision = 0
     var lastSync: Date?
     var syncError: String?
@@ -22,6 +23,7 @@ final class AppModel {
     var sending = false
     var promptBusy: Set<String> = []
 
+    let notifications = TeamNotifications()
     let client = TeamRoomClient()
     let images: ImageStore
     private var pollTask: Task<Void, Never>?
@@ -37,13 +39,28 @@ final class AppModel {
 
     init() {
         images = ImageStore(client: client)
+        notifications.openAgent = { [weak self] id in
+            self?.select(id)
+            self?.scrollRequest += 1
+        }
     }
 
     var selectedAgent: Agent? { agents.first { $0.id == selectedId } }
 
+    var isUITesting: Bool {
+        #if DEBUG
+        return ProcessInfo.processInfo.arguments.contains("-ui-testing")
+        #else
+        return false
+        #endif
+    }
+
     // MARK: - Lifecycle
 
     func boot() async {
+        #if DEBUG
+        if isUITesting { TestFixtures.load(self); return }
+        #endif
         let savedURL = UserDefaults.standard.string(forKey: "teamroom.baseURL")
         let token = KeychainStore.loadToken()
         guard let savedURL, let url = URL(string: savedURL), let token else {
@@ -51,12 +68,14 @@ final class AppModel {
             return
         }
         baseURLString = savedURL
+        notifications.configure(server: savedURL)
         await client.configure(baseURL: url, cookie: token)
         phase = .connecting
         await connect()
     }
 
     func sceneChanged(_ active: Bool) {
+        guard !isUITesting else { return }
         guard phase == .ready else { return }
         foreground = active
         guard active else {
@@ -115,6 +134,7 @@ final class AppModel {
             KeychainStore.save(token: cookie)
             UserDefaults.standard.set(parsed.base.absoluteString, forKey: "teamroom.baseURL")
             baseURLString = parsed.base.absoluteString
+            notifications.configure(server: baseURLString)
             phase = .connecting
             await connect()
         } catch {
@@ -156,11 +176,13 @@ final class AppModel {
     func select(_ id: String) {
         guard id != selectedId else { return }
         selectedId = id
+        notifications.markRead(agentId: id)
         items = []
         refresh()
     }
 
     func refresh() {
+        guard !isUITesting else { return }
         guard phase == .ready else { return }
         if refreshing {
             refreshAgain = true
@@ -192,7 +214,7 @@ final class AppModel {
         if let value = state.revision { revision = value }
         var list = state.agents
         if selectedId.isEmpty || !list.contains(where: { $0.id == selectedId }) {
-            selectedId = defaultAgentId()
+            selectedId = list.first(where: { $0.state == "working" })?.id ?? list.first?.id ?? ""
         }
         if let index = list.firstIndex(where: { $0.id == selectedId }) {
             for other in list.indices where other != index {
@@ -200,10 +222,11 @@ final class AppModel {
                 list[other].events = nil
             }
             let agent = list[index]
-            items = ConversationBuilder.items(messages: agent.messages ?? [], events: agent.events ?? [])
+            items = ConversationBuilder.items(messages: agent.messages ?? [], events: agent.events ?? [], queue: agent.queue ?? [])
         } else {
             items = []
         }
+        notifications.observe(list)
         agents = list
         lastSync = Date()
         syncError = nil

@@ -53,15 +53,49 @@ enum ConversationItem: Identifiable {
 }
 
 enum ConversationBuilder {
-    static func items(messages: [ChatMessage], events: [LiveEvent]) -> [ConversationItem] {
+    static func items(messages: [ChatMessage], events: [LiveEvent], queue: [ChatMessage] = []) -> [ConversationItem] {
         struct Row {
             let time: Date?
+            let priority: Int
+            let sequence: Int
             let item: ConversationItem
         }
+        var visibleMessages = messages
+        // Queue items were previously drawn after all tool output. Put a delivered user message
+        // at its dispatch time until its native transcript copy is available.
+        for pending in queue where ["sending", "streaming"].contains(pending.state ?? "") {
+            let sent = TimeFormat.date(pending.sentAt ?? pending.createdAt)
+            let prefix = String((pending.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).prefix(256))
+            let nativeCopy = messages.contains { message in
+                guard message.role == "user", !prefix.isEmpty,
+                      (message.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix(prefix),
+                      let native = TimeFormat.date(message.time), let sent else { return false }
+                return native.timeIntervalSince(sent) >= -2 && native.timeIntervalSince(sent) < 120
+            }
+            if !nativeCopy {
+                var message = pending
+                message.role = "user"
+                message.time = pending.sentAt ?? pending.createdAt
+                visibleMessages.append(message)
+            }
+        }
         var rows: [Row] = []
-        rows.append(contentsOf: messages.map { Row(time: TimeFormat.date($0.time), item: .message($0)) })
-        rows.append(contentsOf: events.map { Row(time: TimeFormat.date($0.time), item: .activity(ActivityGroup(id: $0.id, events: [$0]))) })
-        rows.sort { ($0.time ?? .distantPast) < ($1.time ?? .distantPast) }
+        rows.append(contentsOf: visibleMessages.enumerated().map {
+            Row(time: TimeFormat.date($0.element.time), priority: $0.element.role == "user" ? 0 : 2,
+                sequence: $0.offset, item: .message($0.element))
+        })
+        let oldest = visibleMessages.compactMap { TimeFormat.date($0.time) }.min()
+        rows.append(contentsOf: events.enumerated().compactMap { index, event in
+            let time = TimeFormat.date(event.time)
+            if let oldest, let time, time < oldest { return nil }
+            return Row(time: time, priority: 1, sequence: index, item: .activity(ActivityGroup(id: event.id, events: [event])))
+        })
+        rows.sort {
+            let a = $0.time ?? .distantPast, b = $1.time ?? .distantPast
+            if a != b { return a < b }
+            if $0.priority != $1.priority { return $0.priority < $1.priority }
+            return $0.sequence < $1.sequence
+        }
 
         var result: [ConversationItem] = []
         var group: ActivityGroup?

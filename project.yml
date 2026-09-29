@@ -7,8 +7,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "0.4.0"
-    CURRENT_PROJECT_VERSION: "4"
+    MARKETING_VERSION: "0.5.0"
+    CURRENT_PROJECT_VERSION: "5"
 targets:
   TeamRoom:
     type: application
@@ -30,6 +30,24 @@ targets:
         CODE_SIGN_STYLE: Manual
         SWIFT_EMIT_LOC_STRINGS: NO
         SUPPORTS_MACCATALYST: NO
+  TeamRoomTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [Tests]
+    dependencies:
+      - target: TeamRoom
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+  TeamRoomUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [UITests]
+    dependencies:
+      - target: TeamRoom
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
 schemes:
   TeamRoom:
     build:
@@ -37,5 +55,10 @@ schemes:
         TeamRoom: all
     run:
       config: Debug
+    test:
+      config: Debug
+      targets:
+        - TeamRoomTests
+        - TeamRoomUITests
     archive:
       config: Release

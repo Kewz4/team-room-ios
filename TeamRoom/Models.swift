@@ -33,6 +33,7 @@ struct Execution: Codable, Hashable {
 struct ChatMessage: Codable, Hashable, Identifiable {
     var id: String
     var role: String?
+    var phase: String?
     var text: String?
     var time: String?
     var agentId: String?
@@ -43,6 +44,15 @@ struct ChatMessage: Codable, Hashable, Identifiable {
     var error: String?
     var retriedAs: String?
     var images: [EventImage]?
+}
+
+struct TaskStatus: Codable, Hashable {
+    var kind: String
+    var label: String
+    var detail: String?
+    var at: String?
+    var eventId: String?
+    var runId: String?
 }
 
 struct LiveEvent: Codable, Hashable, Identifiable {
@@ -129,6 +139,7 @@ struct Agent: Codable, Hashable, Identifiable {
     var effort: String?
     var sessionId: String?
     var state: String?
+    var statusSummary: TaskStatus?
     var execution: Execution?
     var activity: String?
     var connection: AgentConnection?
@@ -144,6 +155,16 @@ struct Agent: Codable, Hashable, Identifiable {
     var prompts: [AgentPrompt]?
     var loading: Bool?
     var error: String?
+
+    var taskStatus: TaskStatus {
+        if let prompt = prompts?.first {
+            return TaskStatus(kind: "needs_input", label: "Needs your input", detail: prompt.title, at: prompt.createdAt, eventId: "\(id):prompt:\(prompt.id)")
+        }
+        if connection?.ready == false { return TaskStatus(kind: "disconnected", label: "Connection lost", detail: connection?.reason) }
+        if state == "working" { return TaskStatus(kind: "working", label: "Working", detail: execution?.label ?? activity, at: execution?.since) }
+        if let statusSummary { return statusSummary }
+        return TaskStatus(kind: state == "idle" ? "idle" : "unknown", label: state == "idle" ? "Ready" : "Checking activity", detail: "Refresh to see the latest task result.")
+    }
 }
 
 struct StateResponse: Codable {

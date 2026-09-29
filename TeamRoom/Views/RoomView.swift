@@ -4,12 +4,17 @@ struct RoomView: View {
     @Environment(AppModel.self) private var model
     @State private var showWorkers = false
     @State private var showSettings = false
+    @State private var showUpdates = false
     @State private var selectedEvent: LiveEvent?
 
     var body: some View {
         NavigationStack {
             ConversationView(selectedEvent: $selectedEvent)
+                .id(model.selectedId)
                 .background(Tokens.background)
+            .safeAreaInset(edge: .top, spacing: 0) {
+                TaskFeedback { showWorkers = true }
+            }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 VStack(spacing: 0) {
                     if let agent = model.selectedAgent, let prompt = agent.prompts?.first {
@@ -36,6 +41,12 @@ struct RoomView: View {
                         header
                     }
                     ToolbarItem(placement: .topBarTrailing) {
+                        Button { showUpdates = true } label: {
+                            Image(systemName: model.notifications.unreadCount > 0 ? "bell.badge" : "bell")
+                        }
+                        .accessibilityLabel("Team updates, \(model.notifications.unreadCount) unread")
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
                         menu
                     }
                 }
@@ -44,6 +55,7 @@ struct RoomView: View {
         .sheet(isPresented: $showWorkers) {
             WorkerSheet()
         }
+        .sheet(isPresented: $showUpdates) { UpdatesInbox() }
         .sheet(isPresented: $showSettings) {
             SettingsView()
         }
@@ -80,16 +92,7 @@ struct RoomView: View {
 
     private var headerSubtitle: String {
         guard let agent = model.selectedAgent else { return "not connected" }
-        let state: String
-        if agent.prompts?.isEmpty == false {
-            state = "needs your input"
-        } else if agent.connection?.ready == false {
-            state = "connection needed"
-        } else if agent.state == "working" {
-            state = agent.execution?.label ?? "working"
-        } else {
-            state = agent.state ?? "unknown"
-        }
+        let state = agent.taskStatus.label
         let account = agent.account ?? ""
         return account.isEmpty ? state : "\(account) Â· \(state)"
     }
@@ -217,16 +220,8 @@ struct WorkerRow: View {
     }
 
     private var statusLine: String {
-        if agent.prompts?.isEmpty == false { return "Waiting for your input" }
-        if agent.connection?.ready == false { return "Runner not connected" }
-        switch agent.state {
-        case "working":
-            return agent.execution?.label ?? "Working"
-        case "idle":
-            return "Idle"
-        default:
-            return "Activity unknown"
-        }
+        let status = agent.taskStatus
+        return status.label + (status.at.map { " · " + TimeFormat.relative($0) } ?? "")
     }
 
     private var stateColor: Color {

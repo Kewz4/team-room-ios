@@ -4,73 +4,94 @@ struct ConversationView: View {
     @Environment(AppModel.self) private var model
     @Binding var selectedEvent: LiveEvent?
     @State private var atBottom = true
-
-    private let bottomID = "conversation-bottom"
+    @State private var followingLatest = true
+    @State private var userIsScrolling = false
+    @State private var position = ScrollPosition(idType: String.self, edge: .bottom)
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    if model.items.isEmpty {
-                        emptyState
-                    }
-                    ForEach(model.items) { item in
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                if model.items.isEmpty { emptyState }
+                ForEach(model.items) { item in
+                    Group {
                         switch item {
                         case .message(let message):
                             MessageRow(agentId: model.selectedId, message: message)
                         case .activity(let group):
-                            ActivityGroupRow(agentId: model.selectedId, group: group) { event in
-                                selectedEvent = event
-                            }
+                            ActivityGroupRow(agentId: model.selectedId, group: group) { selectedEvent = $0 }
                         }
                     }
-                    QueueSection(agentId: model.selectedId)
-                    if let live = model.selectedAgent?.liveText, !live.isEmpty {
-                        LiveTextRow(text: live)
-                    }
-                    Color.clear
-                        .frame(height: 1)
-                        .id(bottomID)
+                    .id(item.id)
                 }
-                .padding(.horizontal, Tokens.Space.m)
-                .padding(.top, Tokens.Space.s)
-                .padding(.bottom, Tokens.Space.m)
+                if let liveText { LiveTextRow(text: liveText) }
+                QueueSection(agentId: model.selectedId)
+                Color.clear.frame(height: 1)
+                    .id("conversation-bottom")
+                    .accessibilityIdentifier("conversation-bottom")
             }
-            .defaultScrollAnchor(.bottom)
-            .scrollDismissesKeyboard(.interactively)
-            .onScrollGeometryChange(for: Bool.self) { geometry in
-                geometry.contentSize.height - geometry.contentOffset.y - geometry.containerSize.height < 160
-            } action: { _, value in
-                atBottom = value
-            }
-            .onChange(of: scrollTick) { _, _ in
-                guard atBottom else { return }
-                withAnimation(.easeOut(duration: 0.18)) {
-                    proxy.scrollTo(bottomID, anchor: .bottom)
-                }
-            }
-            .overlay(alignment: .bottomTrailing) {
-                if !atBottom {
-                    Button {
-                        withAnimation(.snappy(duration: 0.25)) {
-                            proxy.scrollTo(bottomID, anchor: .bottom)
-                        }
-                        atBottom = true
-                    } label: {
-                        Image(systemName: "arrow.down")
-                            .font(.system(size: 15, weight: .semibold))
-                            .frame(width: 38, height: 38)
-                    }
-                    .buttonStyle(.plain)
-                    .glassEffect(.regular.interactive(), in: Circle())
-                    .padding(.trailing, Tokens.Space.m)
-                    .padding(.bottom, Tokens.Space.s)
-                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
-                    .accessibilityLabel("Scroll to latest")
-                }
-            }
-            .animation(.snappy(duration: 0.2), value: atBottom)
+            .scrollTargetLayout()
+            .padding(.horizontal, Tokens.Space.m)
+            .padding(.top, Tokens.Space.s)
+            .padding(.bottom, Tokens.Space.m)
         }
+        .accessibilityIdentifier("conversation-scroll")
+        .scrollPosition($position)
+        .defaultScrollAnchor(.bottom)
+        .scrollDismissesKeyboard(.interactively)
+        .onScrollGeometryChange(for: Bool.self) { geometry in
+            geometry.contentSize.height + geometry.contentInsets.bottom
+                - geometry.contentOffset.y - geometry.containerSize.height < 60
+        } action: { _, value in
+            atBottom = value
+            if userIsScrolling { followingLatest = value }
+        }
+        .onScrollPhaseChange { _, phase in
+            if phase == .tracking || phase == .interacting || phase == .decelerating {
+                userIsScrolling = true
+            } else if phase == .idle && userIsScrolling {
+                followingLatest = atBottom
+                userIsScrolling = false
+            }
+        }
+        .onChange(of: scrollTick) { _, _ in
+            guard followingLatest, !userIsScrolling else { return }
+            Task { @MainActor in
+                await Task.yield()
+                if followingLatest && !userIsScrolling { position.scrollTo(edge: .bottom) }
+            }
+        }
+        .onChange(of: model.scrollRequest) { _, _ in jumpToLatest() }
+        .overlay(alignment: .bottomTrailing) {
+            if !atBottom {
+                Button(action: jumpToLatest) {
+                    Image(systemName: "arrow.down")
+                        .font(.system(size: 15, weight: .semibold))
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+                .glassEffect(.regular.interactive(), in: Circle())
+                .padding(.trailing, Tokens.Space.m)
+                .padding(.bottom, Tokens.Space.s)
+                .accessibilityLabel("Scroll to latest")
+                .accessibilityIdentifier("jump-latest")
+            }
+        }
+    }
+
+    private var liveText: String? {
+        guard let agent = model.selectedAgent, let text = agent.liveText, !text.isEmpty else { return nil }
+        let alreadySaved = (agent.messages ?? []).suffix(6).contains {
+            $0.role == "assistant" && $0.text?.trimmingCharacters(in: .whitespacesAndNewlines)
+                == text.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return alreadySaved ? nil : text
+    }
+
+    private func jumpToLatest() {
+        followingLatest = true
+        userIsScrolling = false
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { position.scrollTo(edge: .bottom) }
     }
 
     private var emptyState: some View {
@@ -92,7 +113,7 @@ struct ConversationView: View {
         let messages = agent.messages?.count ?? 0
         let live = agent.liveText?.count ?? 0
         let queue = agent.queue?.count ?? 0
-        return "\(model.selectedId)-\(messages)-\(live)-\(queue)"
+        return "\(model.selectedId)-\(messages)-\(live)-\(queue)-\(model.items.count)-\(model.revision)"
     }
 }
 
@@ -256,7 +277,10 @@ struct QueueSection: View {
     let agentId: String
 
     var body: some View {
-        let items = (model.selectedAgent?.queue ?? []).filter { ($0.text ?? "").isEmpty == false }
+        let items = (model.selectedAgent?.queue ?? []).filter {
+            ["queued", "waiting_busy", "waiting_connection"].contains($0.state ?? "")
+                || (["failed", "interrupted"].contains($0.state ?? "") && $0.id == model.selectedAgent?.statusSummary?.runId)
+        }
         if !items.isEmpty {
             VStack(alignment: .trailing, spacing: Tokens.Space.s) {
                 ForEach(items) { item in

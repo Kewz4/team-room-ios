@@ -29,7 +29,7 @@ struct SettingsView: View {
                                 Text(agent.label)
                                     .font(.subheadline.weight(.semibold))
                                 Spacer()
-                                Text(agent.state ?? "unknown")
+                                Text(agent.taskStatus.label)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -41,6 +41,27 @@ struct SettingsView: View {
                                 .foregroundStyle(.tertiary)
                         }
                     }
+                }
+
+                Section("Notifications") {
+                    LabeledContent("iPhone permission", value: model.notifications.authorization)
+                    Toggle("Alerts while connected", isOn: Binding(
+                        get: { model.notifications.enabled },
+                        set: { value in
+                            if value { Task { await model.notifications.enable() } }
+                            else { model.notifications.disable() }
+                        }))
+                    if model.notifications.enabled {
+                        Button("Send a test notification") { Task { await model.notifications.sendTest() } }
+                    }
+                    Button("Open iPhone notification settings") {
+                        if let url = URL(string: UIApplication.openNotificationSettingsURLString) { UIApplication.shared.open(url) }
+                    }
+                    if let error = model.notifications.permissionError {
+                        Text(error).foregroundStyle(Tokens.failure)
+                    }
+                } footer: {
+                    Text("Alerts cover finished tasks, failures and requests for input while Team Room is open and connected. The updates inbox catches up when you reopen it. Closed-app push needs APNs-enabled signing and a push server; this sideloaded build does not receive it.")
                 }
 
                 Section("Devices") {

@@ -34,6 +34,9 @@ struct RemoteImage: View {
         .buttonStyle(.plain)
         .accessibilityLabel(image.label ?? "Image attachment")
         .task(id: image.id) {
+            #if DEBUG
+            if model.isUITesting { ui = TestFixtures.image; return }
+            #endif
             guard image.status == "available", ui == nil, !failed else { return }
             let loaded = await model.images.load(agentId: agentId, id: image.id)
             if let loaded {
@@ -74,34 +77,72 @@ struct ImageViewer: View {
     let image: UIImage
     let label: String?
     @Environment(\.dismiss) private var dismiss
+    @State private var scale: CGFloat = 1
+    @State private var pinchStart: CGFloat?
 
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            Image(uiImage: image)
-                .resizable()
-                .scaledToFit()
-                .padding(Tokens.Space.s)
+            GeometryReader { geometry in
+                let factor = min(geometry.size.width / max(image.size.width, 1),
+                                 geometry.size.height / max(image.size.height, 1))
+                ScrollView([.horizontal, .vertical]) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .interpolation(image.size.width <= 128 ? .none : .high)
+                        .frame(width: image.size.width * factor * scale,
+                               height: image.size.height * factor * scale)
+                        .frame(minWidth: geometry.size.width, minHeight: geometry.size.height)
+                        .accessibilityIdentifier("zoom-image")
+                        .onTapGesture(count: 2) { scale = scale > 1 ? 1 : 3 }
+                }
+                .defaultScrollAnchor(.center)
+                .scrollIndicators(.hidden)
+                .simultaneousGesture(MagnifyGesture()
+                    .onChanged { value in
+                        if pinchStart == nil { pinchStart = scale }
+                        scale = min(8, max(1, (pinchStart ?? 1) * value.magnification))
+                    }
+                    .onEnded { _ in pinchStart = nil })
+            }
+            .padding(.vertical, 60)
         }
         .overlay(alignment: .topTrailing) {
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 26))
-                    .symbolRenderingMode(.palette)
-                    .foregroundStyle(.white, .black.opacity(0.35))
-                    .padding(Tokens.Space.m)
+            Button { dismiss() } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 18, weight: .semibold))
+                    .frame(width: 44, height: 44)
             }
-            .accessibilityLabel("Close")
+            .foregroundStyle(.white)
+            .glassEffect(.regular.interactive(), in: Circle())
+            .padding(Tokens.Space.m)
+            .accessibilityLabel("Close image")
         }
         .overlay(alignment: .bottom) {
-            if let label, !label.isEmpty {
-                Text(label)
-                    .font(TypeScale.caption)
-                    .foregroundStyle(.white.opacity(0.8))
-                    .padding(Tokens.Space.m)
+            VStack(spacing: 8) {
+                if let label, !label.isEmpty {
+                    Text(label).font(TypeScale.caption).foregroundStyle(.white.opacity(0.85)).lineLimit(2)
+                }
+                HStack(spacing: 12) {
+                    Button { scale = max(1, scale / 1.5) } label: {
+                        Image(systemName: "minus").frame(width: 44, height: 44)
+                    }.accessibilityLabel("Zoom out").disabled(scale <= 1)
+                    Text("\(Int((scale * 100).rounded()))%")
+                        .font(.caption.monospacedDigit())
+                        .frame(minWidth: 48)
+                        .accessibilityIdentifier("image-zoom-level")
+                    Button { scale = min(8, scale * 1.5) } label: {
+                        Image(systemName: "plus").frame(width: 44, height: 44)
+                    }.accessibilityLabel("Zoom in").disabled(scale >= 8)
+                    Button("Fit") { scale = 1; pinchStart = nil }
+                        .frame(minWidth: 44, minHeight: 44)
+                        .accessibilityLabel("Fit image")
+                }
+                .foregroundStyle(.white)
+                .buttonStyle(.plain)
+                .glassEffect(.regular, in: Capsule())
             }
+            .padding(Tokens.Space.m)
         }
         .statusBarHidden()
     }
