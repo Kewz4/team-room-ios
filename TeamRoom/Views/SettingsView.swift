@@ -43,7 +43,7 @@ struct SettingsView: View {
                     }
                 }
 
-                Section("Notifications") {
+                Section {
                     LabeledContent("iPhone permission", value: model.notifications.authorization)
                     Toggle("Alerts while connected", isOn: Binding(
                         get: { model.notifications.enabled },
@@ -60,6 +60,8 @@ struct SettingsView: View {
                     if let error = model.notifications.permissionError {
                         Text(error).foregroundStyle(Tokens.failure)
                     }
+                } header: {
+                    Text("Notifications")
                 } footer: {
                     Text("Alerts cover finished tasks, failures and requests for input while Team Room is open and connected. The updates inbox catches up when you reopen it. Closed-app push needs APNs-enabled signing and a push server; this sideloaded build does not receive it.")
                 }
