@@ -3,6 +3,9 @@ import SwiftUI
 import UIKit
 
 enum TestFixtures {
+    static var deliveries: [ChatMessage] {
+        [ChatMessage(id: "fixture-failed", text: "Original request that failed delivery", agentId: "fixture", createdAt: "2026-09-29T20:00:00Z", state: "failed", error: "Session limit reached")]
+    }
     static var image: UIImage {
         UIGraphicsImageRenderer(size: CGSize(width: 320, height: 240)).image { context in
             for y in 0..<6 {
@@ -22,7 +25,7 @@ enum TestFixtures {
         }
         messages.append(ChatMessage(id: "latest-user", role: "user", text: "Check the current work and show a table.", time: "2026-09-29T21:01:00Z"))
         messages.append(ChatMessage(id: "latest-result", role: "assistant", phase: "final_answer",
-            text: "Latest fixture result\n\n| Teammate | Outcome |\n| :--- | ---: |\n| OpenCode | Finished |\n| Astra | Working |\n| Claude | Needs input |",
+            text: "Latest fixture result\n\n[Open fixture report](workspace/shared/fixture-report.md)\n\n| Teammate | Outcome |\n| :--- | ---: |\n| OpenCode | Finished |\n| Astra | Working |\n| Claude | Needs input |",
             time: "2026-09-29T21:01:02Z", images: [EventImage(id: "fixture-image", label: "Fixture artwork", status: "available", mime: "image/png")]))
         let events = [LiveEvent(id: "latest-command", kind: "tool", title: "Inspect current work", time: "2026-09-29T21:01:01Z", status: "completed", action: "command")]
         let finished = TaskStatus(kind: "completed", label: "Finished", detail: "Current work has been checked.", at: "2026-09-29T21:01:02Z", eventId: "fixture-finished")

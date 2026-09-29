@@ -96,6 +96,51 @@ actor TeamRoomClient {
         _ = try await data(for: post(try endpoint("/api/retry"), Body(id: id)))
     }
 
+    func deliveryHistory(agentId: String) async throws -> [ChatMessage] {
+        let result = try await perform(get(try endpoint("/api/delivery-history", query: ["agentId": agentId])), as: DeliveryHistory.self)
+        return result.messages
+    }
+
+    func delivery(id: String, agentId: String) async throws -> ChatMessage {
+        try await perform(get(try endpoint("/api/message", query: ["id": id, "agentId": agentId])), as: ChatMessage.self)
+    }
+
+    func editDelivery(id: String, agentId: String, text: String) async throws {
+        struct Body: Codable { var id: String; var agentId: String; var text: String }
+        _ = try await data(for: post(try endpoint("/api/edit-message"), Body(id: id, agentId: agentId, text: text)))
+    }
+
+    func deleteDelivery(id: String, agentId: String) async throws {
+        struct Body: Codable { var id: String; var agentId: String }
+        _ = try await data(for: post(try endpoint("/api/delete-message"), Body(id: id, agentId: agentId)))
+    }
+
+    func restoreDelivery(id: String, agentId: String) async throws {
+        struct Body: Codable { var id: String; var agentId: String }
+        _ = try await data(for: post(try endpoint("/api/restore-message"), Body(id: id, agentId: agentId)))
+    }
+
+    func artifact(path: String) async throws -> Data {
+        try await data(for: get(try endpoint("/api/artifact", query: ["path": path])))
+    }
+
+    func pushStatus() async throws -> PushStatus {
+        try await perform(get(try endpoint("/api/push/status")), as: PushStatus.self)
+    }
+
+    func registerPush(token: String, environment: String) async throws {
+        struct Body: Codable { var token: String; var environment: String; var topic: String }
+        _ = try await data(for: post(try endpoint("/api/push/register"), Body(token: token, environment: environment, topic: Bundle.main.bundleIdentifier ?? "com.kewz.teamroom")))
+    }
+
+    func unregisterPush() async {
+        if let request = try? post(endpoint("/api/push/unregister"), Empty()) { _ = try? await data(for: request) }
+    }
+
+    func testPush() async throws {
+        _ = try await data(for: post(try endpoint("/api/push/test"), Empty()))
+    }
+
     func stop(agentId: String) async throws {
         struct Body: Codable { var agentId: String }
         _ = try await data(for: post(try endpoint("/api/stop"), Body(agentId: agentId)))

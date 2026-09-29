@@ -136,7 +136,7 @@ enum MarkdownBlocks {
             interpretedSyntax: .inlineOnlyPreservingWhitespace,
             failurePolicy: .returnPartiallyParsedIfPossible
         )
-        return (try? AttributedString(markdown: text, options: options)) ?? AttributedString(text)
+        return (try? AttributedString(markdown: LinkRouting.prepareMarkdown(text), options: options)) ?? AttributedString(text)
     }
 
     private static func heading(_ line: String) -> (level: Int, text: String)? {

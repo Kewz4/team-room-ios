@@ -5,6 +5,7 @@ struct RoomView: View {
     @State private var showWorkers = false
     @State private var showSettings = false
     @State private var showUpdates = false
+    @State private var showDeliveries = false
     @State private var selectedEvent: LiveEvent?
 
     var body: some View {
@@ -52,6 +53,11 @@ struct RoomView: View {
                 }
         }
         .tint(Tokens.accent)
+        .environment(\.openURL, model.linkAction())
+        .sheet(item: Binding(get: { model.artifact }, set: { model.artifact = $0 })) { request in
+            ArtifactPreview(request: request)
+        }
+        .sheet(isPresented: $showDeliveries) { DeliveryCenter(agentId: model.selectedId) }
         .sheet(isPresented: $showWorkers) {
             WorkerSheet()
         }
@@ -107,6 +113,11 @@ struct RoomView: View {
 
     private var menu: some View {
         Menu {
+            Button {
+                showDeliveries = true
+            } label: {
+                Label("Delivery queue", systemImage: "tray")
+            }
             Button {
                 showSettings = true
             } label: {

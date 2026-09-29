@@ -22,6 +22,7 @@ final class AppModel {
     var actionError: String?
     var sending = false
     var promptBusy: Set<String> = []
+    var artifact: ArtifactRequest?
 
     let notifications = TeamNotifications()
     let client = TeamRoomClient()
@@ -39,6 +40,7 @@ final class AppModel {
 
     init() {
         images = ImageStore(client: client)
+        notifications.client = client
         notifications.openAgent = { [weak self] id in
             self?.select(id)
             self?.scrollRequest += 1
@@ -98,6 +100,7 @@ final class AppModel {
             let state = try await client.state(agentId: nil)
             apply(state)
             phase = .ready
+            Task { await notifications.refreshPush(register: notifications.enabled) }
             startPolling()
             startSocket()
             refresh()
@@ -225,7 +228,7 @@ final class AppModel {
                 list[other].events = nil
             }
             let agent = list[index]
-            items = ConversationBuilder.items(messages: agent.messages ?? [], events: agent.events ?? [], queue: agent.queue ?? [])
+            items = ConversationBuilder.items(messages: agent.messages ?? [], events: agent.events ?? [])
         } else {
             items = []
         }
@@ -461,7 +464,7 @@ final class AppModel {
         socketGeneration += 1
         socketTask?.cancel(with: .goingAway, reason: nil)
         socketTask = nil
-        Task { await client.signOut() }
+        Task { await client.unregisterPush(); await client.signOut() }
         KeychainStore.delete()
         UserDefaults.standard.removeObject(forKey: "teamroom.baseURL")
         agents = []

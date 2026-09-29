@@ -11,7 +11,7 @@ struct ConversationView: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 0) {
                 if model.items.isEmpty { emptyState }
                 ForEach(model.items) { item in
                     Group {
@@ -275,11 +275,20 @@ struct ActivityEventRow: View {
 struct QueueSection: View {
     @Environment(AppModel.self) private var model
     let agentId: String
+    @State private var showDeliveries = false
 
     var body: some View {
-        let items = (model.selectedAgent?.queue ?? []).filter {
-            ["queued", "waiting_busy", "waiting_connection"].contains($0.state ?? "")
-                || (["failed", "interrupted"].contains($0.state ?? "") && $0.id == model.selectedAgent?.statusSummary?.runId)
+        let items = (model.selectedAgent?.queue ?? []).filter { ["queued", "waiting_busy", "waiting_connection"].contains($0.state ?? "") }
+        let failures = (model.selectedAgent?.queue ?? []).filter { ["failed", "interrupted"].contains($0.state ?? "") }
+        if !failures.isEmpty {
+            Button {
+                showDeliveries = true
+            } label: {
+                Label("\(failures.count) delivery issue\(failures.count == 1 ? "" : "s") · Manage", systemImage: "tray")
+                    .font(.subheadline)
+                    .frame(minHeight: 44)
+            }
+            .sheet(isPresented: $showDeliveries) { DeliveryCenter(agentId: agentId) }
         }
         if !items.isEmpty {
             VStack(alignment: .trailing, spacing: Tokens.Space.s) {

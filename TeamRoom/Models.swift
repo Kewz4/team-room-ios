@@ -43,7 +43,17 @@ struct ChatMessage: Codable, Hashable, Identifiable {
     var state: String?
     var error: String?
     var retriedAs: String?
+    var editedAt: String?
+    var redacted: Bool?
     var images: [EventImage]?
+}
+
+struct DeliveryHistory: Codable { var messages: [ChatMessage] }
+struct PushStatus: Codable {
+    var configured: Bool
+    var registered: Bool?
+    var reason: String?
+    var topic: String?
 }
 
 struct TaskStatus: Codable, Hashable {

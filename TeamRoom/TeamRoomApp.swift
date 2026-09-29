@@ -2,6 +2,7 @@ import SwiftUI
 
 @main
 struct TeamRoomApp: App {
+    @UIApplicationDelegateAdaptor(PushDelegate.self) private var pushDelegate
     @State private var model = AppModel()
     @Environment(\.scenePhase) private var scenePhase
 
@@ -10,7 +11,7 @@ struct TeamRoomApp: App {
             RootView()
                 .environment(model)
                 .tint(Tokens.accent)
-                .task { await model.boot() }
+                .task { pushDelegate.notifications = model.notifications; await model.boot() }
                 .onChange(of: scenePhase) { _, phase in
                     model.sceneChanged(phase == .active)
                 }

@@ -45,14 +45,20 @@ struct SettingsView: View {
 
                 Section {
                     LabeledContent("iPhone permission", value: model.notifications.authorization)
-                    Toggle("Alerts while connected", isOn: Binding(
+                    Toggle("iPhone notifications", isOn: Binding(
                         get: { model.notifications.enabled },
                         set: { value in
                             if value { Task { await model.notifications.enable() } }
                             else { model.notifications.disable() }
                         }))
                     if model.notifications.enabled {
-                        Button("Send a test notification") { Task { await model.notifications.sendTest() } }
+                        Button("Test local alert") { Task { await model.notifications.sendTest() } }
+                    }
+                    LabeledContent("Signing profile", value: model.notifications.signingStatus)
+                    LabeledContent("Background delivery", value: model.notifications.remoteStatus)
+                    Button("Recheck push setup") { Task { await model.notifications.refreshPush(register: model.notifications.enabled) } }
+                    if model.notifications.remoteRegistered {
+                        Button("Test background push") { Task { await model.notifications.testRemotePush() } }
                     }
                     Button("Open iPhone notification settings") {
                         if let url = URL(string: UIApplication.openNotificationSettingsURLString) { UIApplication.shared.open(url) }
@@ -63,7 +69,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Notifications")
                 } footer: {
-                    Text("Alerts cover finished tasks, failures and requests for input while Team Room is open and connected. The updates inbox catches up when you reopen it. Closed-app push needs APNs-enabled signing and a push server; this sideloaded build does not receive it.")
+                    Text("Notifications cover finished tasks, failures and requests for input. Background delivery needs a push-enabled signing profile and APNs server credentials. Until both are configured, alerts arrive while Team Room is open and the inbox catches up when you return.")
                 }
 
                 Section("Devices") {

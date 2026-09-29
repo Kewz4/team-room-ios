@@ -26,6 +26,33 @@ final class TeamRoomUITests: XCTestCase {
         app.buttons["Fit image"].tap()
         XCTAssertEqual(app.staticTexts["image-zoom-level"].label, "100%")
         app.buttons["Close image"].tap()
+        app.links["Open fixture report"].tap()
+        XCTAssertTrue(app.staticTexts["Fixture report preview"].waitForExistence(timeout: 5))
+        capture("report-preview", app)
+        app.buttons["Done"].tap()
+    }
+
+    func testFailedDeliverySwipeEditDeleteAndUndo() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-ui-testing"]
+        app.launch()
+        app.buttons["More"].firstMatch.tap()
+        app.buttons["Delivery queue"].tap()
+        let row = app.descendants(matching: .any).matching(identifier: "delivery-fixture-failed").firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        row.swipeRight()
+        app.buttons["Edit"].tap()
+        let editor = app.textViews["delivery-editor"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 5))
+        editor.tap()
+        editor.typeText(" revised")
+        app.buttons["Save changes"].tap()
+        row.swipeLeft()
+        app.buttons["Delete"].tap()
+        XCTAssertTrue(app.buttons["Undo delete"].waitForExistence(timeout: 5))
+        capture("delivery-delete-undo", app)
+        app.buttons["Undo delete"].tap()
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
     }
 
     private func capture(_ name: String, _ app: XCUIApplication) {

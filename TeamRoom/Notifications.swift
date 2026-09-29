@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import UserNotifications
+import UIKit
 
 struct TeamNotice: Codable, Identifiable, Hashable {
     var id: String
@@ -45,6 +46,10 @@ final class TeamNotifications: NSObject, UNUserNotificationCenterDelegate {
     var enabled = UserDefaults.standard.bool(forKey: "teamroom.alerts.enabled")
     var authorization = "Not requested"
     var permissionError: String?
+    var remoteStatus = "Push setup not checked"
+    var remoteRegistered = false
+    var signingStatus = "Not checked"
+    var client: TeamRoomClient?
     var openAgent: ((String) -> Void)?
     private var storageKey = ""
     private let center = UNUserNotificationCenter.current()
@@ -69,6 +74,7 @@ final class TeamNotifications: NSObject, UNUserNotificationCenterDelegate {
         let fresh = ledger.consume(agents)
         persist()
         guard enabled else { return }
+        if remoteRegistered { updateBadge(); return }
         for notice in fresh {
             Task { await deliver(notice) }
         }
@@ -81,6 +87,7 @@ final class TeamNotifications: NSObject, UNUserNotificationCenterDelegate {
             enabled = try await center.requestAuthorization(options: [.alert, .sound, .badge])
             UserDefaults.standard.set(enabled, forKey: "teamroom.alerts.enabled")
             await refreshPermission()
+            await refreshPush(register: enabled)
             updateBadge()
         } catch { permissionError = error.localizedDescription }
     }
@@ -89,6 +96,8 @@ final class TeamNotifications: NSObject, UNUserNotificationCenterDelegate {
         enabled = false
         UserDefaults.standard.set(false, forKey: "teamroom.alerts.enabled")
         center.removeAllPendingNotificationRequests()
+        remoteRegistered = false
+        Task { await client?.unregisterPush() }
         Task { try? await center.setBadgeCount(0) }
     }
 
@@ -104,6 +113,36 @@ final class TeamNotifications: NSObject, UNUserNotificationCenterDelegate {
         case .notDetermined: authorization = "Not requested"
         @unknown default: authorization = "Unknown"
         }
+    }
+
+    func refreshPush(register: Bool = false) async {
+        let environment = SigningProfile.pushEnvironment()
+        signingStatus = environment.map { "Profile permits \($0) push" } ?? "Will verify with iOS during registration"
+        guard let client else { remoteStatus = "Connect to the Team Room first"; return }
+        do {
+            let status = try await client.pushStatus()
+            if !status.configured { remoteStatus = status.reason ?? "APNs server setup required"; remoteRegistered = false }
+            if register && enabled {
+                if status.configured { remoteStatus = "Registering this iPhone…" }
+                UIApplication.shared.registerForRemoteNotifications()
+            } else if status.configured { remoteStatus = status.registered == true ? "Device registered" : "Enable alerts to register this iPhone" }
+        } catch { remoteStatus = "Push server unavailable: " + error.localizedDescription }
+    }
+
+    func registerRemoteToken(_ token: String) async {
+        guard enabled, let client else { return }
+        let environment = SigningProfile.pushEnvironment() ?? "production"
+        signingStatus = "iOS accepted push registration"
+        do {
+            try await client.registerPush(token: token, environment: environment)
+            remoteRegistered = true
+            remoteStatus = "Registered for background alerts"
+        } catch { remoteRegistered = false; remoteStatus = error.localizedDescription }
+    }
+
+    func testRemotePush() async {
+        do { try await client?.testPush() }
+        catch { permissionError = error.localizedDescription }
     }
 
     func sendTest() async {
