@@ -97,7 +97,10 @@ final class TeamNotifications: NSObject, UNUserNotificationCenterDelegate {
         switch settings.authorizationStatus {
         case .authorized: authorization = "Allowed"
         case .provisional, .ephemeral: authorization = "Quiet delivery"
-        case .denied: authorization = "Disabled in iPhone Settings"
+        case .denied:
+            authorization = "Disabled in iPhone Settings"
+            enabled = false
+            UserDefaults.standard.set(false, forKey: "teamroom.alerts.enabled")
         case .notDetermined: authorization = "Not requested"
         @unknown default: authorization = "Unknown"
         }

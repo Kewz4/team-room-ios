@@ -71,3 +71,15 @@ link and paste it again; the app re-pairs in place.
 
 - iPhone/iPad on iOS 26 or later (built against the latest iOS SDK; iOS 26 is the Liquid Glass baseline).
 - The PC side: Team Room server + tunnel running (`start-remote.ps1`) and reachable.
+
+
+## 0.5.0 — task feedback and conversation fixes
+
+- Finished, Working, Needs your input, Failed and Interrupted outcomes with timestamps and team counts.
+- Durable updates inbox and optional local banners/sound/badge while the app is open and connected. Enable these in Settings; test notification and iPhone settings links are included. This unsigned sideload build has no APNs entitlement/provider, so it does not promise background or closed-app push. The inbox catches up on reconnect.
+- Sent prompts appear before their tool work; streaming queue copies are merged with native messages. Historical delivery failures no longer repeat full prompts below the active turn.
+- Scroll-to-latest uses ScrollPosition's bottom edge; manual reading pauses following and the button restores it.
+- Markdown tables render aligned columns with horizontal scrolling, inline styles and escaped pipes.
+- Image attachments support pinch zoom, panning, double-tap, zoom buttons and Fit.
+
+The bridge's new statusSummary field is optional; legacy explicit completion events remain supported so active runners do not need to be interrupted for the UI update. Tests cover tables, ordering, outcome precedence and notification deduplication. The GitHub workflow also exercises scrolling, table rendering and image zoom in the iOS simulator and exports screenshots. Install the new unsigned IPA using the existing sideload method; an old installed build will not update itself.

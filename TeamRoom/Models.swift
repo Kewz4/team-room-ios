@@ -163,6 +163,30 @@ struct Agent: Codable, Hashable, Identifiable {
         if connection?.ready == false { return TaskStatus(kind: "disconnected", label: "Connection lost", detail: connection?.reason) }
         if state == "working" { return TaskStatus(kind: "working", label: "Working", detail: execution?.label ?? activity, at: execution?.since) }
         if let statusSummary { return statusSummary }
+        // v0.4 bridges already expose explicit completion events. Keep feedback useful
+        // without requiring a bridge restart while another teammate is still working.
+        if state == "idle" {
+            let queued = (queue ?? []).last { ["queued", "waiting_busy", "waiting_connection", "sending", "streaming"].contains($0.state ?? "") }
+            if let queued { return TaskStatus(kind: "queued", label: "Queued", detail: "Your message is waiting to start.", at: queued.createdAt, runId: queued.id) }
+            let terminal = (events ?? []).filter {
+                ["Reply complete", "Turn completed", "Turn failed", "Message failed", "Turn stopped"].contains($0.title)
+            }.max { (TimeFormat.date($0.time) ?? .distantPast) < (TimeFormat.date($1.time) ?? .distantPast) }
+            let failure = (queue ?? []).filter { ["failed", "interrupted"].contains($0.state ?? "") }.max {
+                (TimeFormat.date($0.completedAt ?? $0.createdAt) ?? .distantPast) < (TimeFormat.date($1.completedAt ?? $1.createdAt) ?? .distantPast)
+            }
+            if let failure, (TimeFormat.date(failure.completedAt ?? failure.createdAt) ?? .distantPast)
+                >= (TimeFormat.date(terminal?.time) ?? .distantPast).addingTimeInterval(-2) {
+                let kind = failure.state ?? "failed"
+                return TaskStatus(kind: kind, label: kind == "interrupted" ? "Interrupted" : "Failed", detail: failure.error,
+                                  at: failure.completedAt ?? failure.createdAt, eventId: "\(id):run:\(failure.id):\(kind)", runId: failure.id)
+            }
+            if let terminal {
+                let completed = ["Reply complete", "Turn completed"].contains(terminal.title)
+                return TaskStatus(kind: completed ? "completed" : "failed", label: completed ? "Finished" : "Failed",
+                    detail: completed ? "The latest task finished. Open its conversation for the result." : terminal.detailPreview,
+                    at: terminal.time, eventId: "\(id):event:\(terminal.id)")
+            }
+        }
         return TaskStatus(kind: state == "idle" ? "idle" : "unknown", label: state == "idle" ? "Ready" : "Checking activity", detail: "Refresh to see the latest task result.")
     }
 }

@@ -213,6 +213,9 @@ final class AppModel {
     private func apply(_ state: StateResponse) {
         if let value = state.revision { revision = value }
         var list = state.agents
+        for index in list.indices where list[index].statusSummary == nil {
+            list[index].statusSummary = list[index].taskStatus
+        }
         if selectedId.isEmpty || !list.contains(where: { $0.id == selectedId }) {
             selectedId = list.first(where: { $0.state == "working" })?.id ?? list.first?.id ?? ""
         }
