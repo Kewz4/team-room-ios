@@ -18,13 +18,15 @@ jobs:
       - name: Select stable iOS 26 Xcode
         run: |
           ls -d /Applications/Xcode*.app
-          XCODE=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | grep -vi beta | sort -V | head -n 1)
-          if [ -z "$XCODE" ]; then XCODE=/Applications/Xcode.app; fi
+          XCODE=/Applications/Xcode_26.5.app
+          if [ ! -d "$XCODE" ]; then XCODE=/Applications/Xcode.app; fi
           echo "Using $XCODE"
           sudo xcode-select -s "$XCODE"
           echo "DEVELOPER_DIR=$XCODE/Contents/Developer" >> "$GITHUB_ENV"
           sudo xcodebuild -runFirstLaunch
+          killall XCBBuildService 2>/dev/null || true
           xcodebuild -version
+          xcodebuild -showsdks
 
       - name: Install XcodeGen
         run: brew install xcodegen
@@ -38,6 +40,7 @@ jobs:
           DEVICE=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; rows=[v for k in sorted(d,reverse=True) if "iOS-" in k for v in d[k] if v.get("isAvailable") and v["name"].startswith("iPhone")]; print(rows[0]["udid"] if rows else "")')
           test -n "$DEVICE"
           xcodebuild test -project TeamRoom.xcodeproj -scheme TeamRoom \
+            -jobs 1 \
             -destination "platform=iOS Simulator,id=$DEVICE" \
             -parallel-testing-enabled NO \
             -resultBundlePath "$RUNNER_TEMP/TeamRoomTests.xcresult" \
