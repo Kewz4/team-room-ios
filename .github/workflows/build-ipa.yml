@@ -15,12 +15,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Select newest Xcode
+      - name: Select stable iOS 26 Xcode
         run: |
-          XCODE=$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -n 1)
+          ls -d /Applications/Xcode*.app
+          XCODE=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | grep -vi beta | sort -V | head -n 1)
           if [ -z "$XCODE" ]; then XCODE=/Applications/Xcode.app; fi
           echo "Using $XCODE"
           sudo xcode-select -s "$XCODE"
+          echo "DEVELOPER_DIR=$XCODE/Contents/Developer" >> "$GITHUB_ENV"
+          sudo xcodebuild -runFirstLaunch
           xcodebuild -version
 
       - name: Install XcodeGen
@@ -48,6 +51,7 @@ jobs:
             xcrun xcresulttool export attachments --path "$RUNNER_TEMP/TeamRoomTests.xcresult" --output-path "$RUNNER_TEMP/qa"
           fi
           cp "$RUNNER_TEMP/test.log" "$RUNNER_TEMP/qa/" 2>/dev/null || true
+          find "$HOME/Library/Logs/DiagnosticReports" -maxdepth 1 -type f -name '*BuildService*' -exec cp {} "$RUNNER_TEMP/qa/" \; 2>/dev/null || true
 
       - name: Upload test evidence
         if: always()
