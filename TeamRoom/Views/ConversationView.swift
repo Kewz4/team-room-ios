@@ -6,7 +6,7 @@ struct ConversationView: View {
     @State private var atBottom = true
     @State private var followingLatest = true
     @State private var userIsScrolling = false
-    @State private var position = ScrollPosition(idType: String.self, edge: .bottom)
+    @State private var scrollHandle = ScrollHandle()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -30,14 +30,15 @@ struct ConversationView: View {
                     .id("conversation-bottom")
                     .accessibilityIdentifier("conversation-bottom")
             }
-            .scrollTargetLayout()
+            .background(ScrollHandleBinder(handle: scrollHandle) {
+                if followingLatest { scrollHandle.bottom() }
+            })
             .padding(.horizontal, Tokens.Space.m)
             .padding(.top, Tokens.Space.s)
             .padding(.bottom, Tokens.Space.m)
         }
         .accessibilityIdentifier("conversation-scroll")
-        .scrollPosition($position)
-        .defaultScrollAnchor(.bottom)
+        .defaultScrollAnchor(.bottom, for: .initialOffset)
         .scrollDismissesKeyboard(.interactively)
         .onScrollGeometryChange(for: Bool.self) { geometry in
             geometry.contentSize.height + geometry.contentInsets.bottom
@@ -58,7 +59,7 @@ struct ConversationView: View {
             guard followingLatest, !userIsScrolling else { return }
             Task { @MainActor in
                 await Task.yield()
-                if followingLatest && !userIsScrolling { position.scrollTo(edge: .bottom) }
+                if followingLatest && !userIsScrolling { scrollHandle.bottom() }
             }
         }
         .onChange(of: model.scrollRequest) { _, _ in jumpToLatest() }
@@ -68,9 +69,10 @@ struct ConversationView: View {
                     Image(systemName: "arrow.down")
                         .font(.system(size: 15, weight: .semibold))
                         .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
-                .glassEffect(.regular.interactive(), in: Circle())
+                .buttonStyle(.glass)
+                .clipShape(Circle())
                 .padding(.trailing, Tokens.Space.m)
                 .padding(.bottom, Tokens.Space.s)
                 .accessibilityLabel("Scroll to latest")
@@ -91,7 +93,11 @@ struct ConversationView: View {
     private func jumpToLatest() {
         followingLatest = true
         userIsScrolling = false
-        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { position.scrollTo(edge: .bottom) }
+        scrollHandle.bottom()
+        Task { @MainActor in
+            await Task.yield()
+            if followingLatest && !userIsScrolling { scrollHandle.bottom() }
+        }
     }
 
     private var emptyState: some View {

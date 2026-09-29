@@ -38,7 +38,7 @@ final class TeamRoomUITests: XCTestCase {
         app.launch()
         app.buttons["More"].firstMatch.tap()
         app.buttons["Delivery queue"].tap()
-        let row = app.descendants(matching: .any).matching(identifier: "delivery-fixture-failed").firstMatch
+        let row = app.cells.containing(.staticText, identifier: "delivery-body-fixture-failed").firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 5))
         row.swipeRight()
         app.buttons["Edit"].tap()

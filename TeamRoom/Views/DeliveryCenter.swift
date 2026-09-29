@@ -91,6 +91,7 @@ struct DeliveryCenter: View {
                 Text(TimeFormat.relative(item.createdAt)).font(.caption2).foregroundStyle(.secondary)
             }
             Text(item.text ?? "").font(.subheadline).lineLimit(3)
+                .accessibilityIdentifier("delivery-body-" + item.id)
             if let error = item.error { Text(error).font(.caption).foregroundStyle(.secondary).lineLimit(2) }
             if ["failed", "interrupted"].contains(item.state ?? "") {
                 Button("Retry") {
@@ -102,10 +103,13 @@ struct DeliveryCenter: View {
                     }
                 }
                 .font(.subheadline.weight(.semibold))
+                .buttonStyle(.borderless)
+                .frame(minHeight: 44)
             }
         }
         .padding(.vertical, 4)
-        .accessibilityIdentifier("delivery-" + item.id)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .contain)
     }
 
     private func load() async {
