@@ -36,7 +36,7 @@ This repo does not hold certificates or provisioning profiles. Sign on your devi
 The tunnel hostname is temporary (Cloudflare Quick Tunnel): if it changes after a tunnel restart, create a fresh device
 link and paste it again; the app re-pairs in place.
 
-## What it does today (v0.2)
+## What it does today (v0.5.0)
 
 - Hamburger teammate drawer with brand icons (DeepSeek / OpenAI / Claude), state dots, and usage-window bars
   (5-hour + weekly, colored by pressure) wherever the server reports them.
@@ -46,19 +46,18 @@ link and paste it again; the app re-pairs in place.
 - **Decision cards**: when a Codex teammate asks a question (one or many), requests a command/file approval, or asks
   for extra sandbox permissions, a card pins above the composer — options, free-text "other", approve/deny, allow-once
   vs allow-session — and the answer travels back through the bridge (`POST /api/prompt-response`).
-  Claude CLI (`--input-format stream-json` + `--permission-prompts`) and OpenCode (`permission.asked` /
-  `question.asked` are already forwarded) answering paths are the next providers to wire.
+  The bridge also routes Claude and OpenCode decision prompts.
 - Scroll-to-bottom control that appears when you scroll back through history.
 - Delivery queue with states (queued, waiting for busy/connection), cancel, retry, and **Stop this turn**.
 - Live updates over `/live` WebSocket (coalesced frames) with a slow safety poll; polling pauses in the background.
 - Warm-neutral design system with one pine accent, light/dark tokens, 8pt grid, SF Symbols only.
 - Pairing/security: device-link sign-in only, cookie in Keychain, no credentials or links in the repo.
 
-## Not yet (next)
+## Remaining setup
 
-- Message **steering** ("Steer now" vs "Queue next") — the app is ready to send a `mode` field on `POST /api/messages`,
-  but the server side must ship first (planned in the Team Room rework).
-- Message search, push notifications.
+- Closed-app push needs a push-enabled signing profile and matching APNs provider credentials on the PC. The app
+  shows the actual registration/setup result in Settings; delivery must still be checked on the signed iPhone.
+- Message search is not included.
 
 ## API used
 
@@ -78,10 +77,10 @@ link and paste it again; the app re-pairs in place.
 - Finished, Working, Needs your input, Failed and Interrupted outcomes with timestamps and team counts.
 - Durable updates inbox and optional local banners/sound/badge while the app is open and connected. Enable these in Settings; test notification and iPhone settings links are included. Native APNs registration and provider support are included. Closed-app delivery requires a push-enabled signed profile and matching APNs server credentials; a general signing certificate alone is not sufficient. The inbox catches up on reconnect.
 - Normal conversation ordering is preserved. Failed deliveries are clearly separated in a Delivery queue with swipe-right Edit, swipe-left Delete, undo/restore, and a separate Retry action.
-- Scroll-to-latest uses ScrollPosition's bottom edge; manual reading pauses following and the button restores it.
+- Scroll-to-latest uses the conversation's measured scroll height; manual reading pauses following and the button restores it.
 - Markdown tables render aligned columns with horizontal scrolling, inline styles and escaped pipes.
 - Image attachments support pinch zoom, panning, double-tap, zoom buttons and Fit.
 
-The bridge's new statusSummary field is optional; legacy explicit completion events remain supported so active runners do not need to be interrupted for the UI update. Tests cover tables, ordering, outcome precedence and notification deduplication. The GitHub workflow also exercises scrolling, table rendering and image zoom in the iOS simulator and exports screenshots. Install the new unsigned IPA using the existing sideload method; an old installed build will not update itself.
+The bridge's new statusSummary field is optional; legacy explicit completion events remain supported so active runners do not need to be interrupted for the UI update. Tests cover tables, links, outcome precedence and notification deduplication. The GitHub workflow also exercises scrolling, table rendering and image zoom in the iOS simulator and exports screenshots. Install the new unsigned IPA using the existing sideload method, including KravaSign; an old installed build will not update itself.
 
 Shared report links open an authenticated in-app preview; normal web links use the system browser. Missing or disallowed files show an error. The simulator tests also cover failed-delivery swipe/edit/delete/undo and report links.
