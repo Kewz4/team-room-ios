@@ -221,7 +221,7 @@ struct WorkerRow: View {
 
     private var statusLine: String {
         let status = agent.taskStatus
-        return status.label + (status.at.map { " · " + TimeFormat.relative($0) } ?? "")
+        return status.label + (status.at.map { " Â· " + TimeFormat.relative($0) } ?? "")
     }
 
     private var stateColor: Color {
