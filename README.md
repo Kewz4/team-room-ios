@@ -36,10 +36,14 @@ This repo does not hold certificates or provisioning profiles. Sign on your devi
 The tunnel hostname is temporary (Cloudflare Quick Tunnel): if it changes after a tunnel restart, create a fresh device
 link and paste it again; the app re-pairs in place.
 
-## What it does today (v0.5.1)
+## What it does today (v0.6.0)
 
 - Hamburger teammate drawer with brand icons (DeepSeek / OpenAI / Claude), state dots, and usage-window bars
   (5-hour + weekly, colored by pressure) wherever the server reports them.
+- **Pre-paid accounts show a balance instead of usage windows.** Flint runs on the DeepSeek Harness, whose account
+  reports money rather than percentages, so his row shows a compact balance chip and Settings lists every wallet the
+  account holds (a multi-currency account can have more than one) with its source and freshness. Nothing about the
+  key behind that number reaches the phone: the bridge resolves it on the PC and sends only the amount.
 - Real conversation view: transcript messages, live streaming reply text, and compact **activity dropdowns**
   ("Used 2 tools, ran 3 commands ›") that expand into one-line tool rows with full detail sheets.
 - Inline image previews from `/api/media` (cookie-authenticated, downsampled, bounded cache) with a full-screen viewer.
@@ -71,6 +75,15 @@ link and paste it again; the app re-pairs in place.
 - iPhone/iPad on iOS 26 or later (built against the latest iOS SDK; iOS 26 is the Liquid Glass baseline).
 - The PC side: Team Room server + tunnel running (`start-remote.ps1`) and reachable.
 
+
+## 0.6.0 — DeepSeek balance and the harness teammate
+
+- Decodes the bridge's `usage.balance` object: amount, currency, source, freshness, and every wallet on a
+  multi-currency account. Amounts render with the currency's own symbol.
+- The teammate row shows a balance chip for pre-paid accounts and keeps the 5-hour/weekly bars for everyone else.
+- Settings shows `Balance … · as of … · source`, or `Balance not reported` with the bridge's reason when the PC has
+  no balance source configured.
+- Maps the new `dsh` provider to the DeepSeek brand mark.
 
 ## 0.5.1 — usage timestamp compatibility
 

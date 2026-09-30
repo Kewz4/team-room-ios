@@ -218,7 +218,9 @@ struct WorkerRow: View {
                     .lineLimit(1)
             }
             Spacer(minLength: Tokens.Space.s)
-            if hasUsage {
+            if let balance = agent.usage?.balance {
+                BalanceChip(balance: balance)
+            } else if hasUsage {
                 UsageBars(usage: agent.usage)
             }
         }
@@ -287,6 +289,24 @@ struct UsageBars: View {
     }
 }
 
+/// Pre-paid accounts report a balance rather than usage windows: a compact amount, or a dash when unknown.
+struct BalanceChip: View {
+    let balance: AgentBalance
+
+    var body: some View {
+        HStack(spacing: Tokens.Space.xs) {
+            Image(systemName: "creditcard")
+                .font(.system(size: 10))
+                .foregroundStyle(Tokens.textTertiary)
+            Text(balance.displayAmount ?? "—")
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .foregroundStyle(balance.hasAmount ? Tokens.textSecondary : Tokens.textTertiary)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(balance.hasAmount ? "Balance \(balance.displayAmount ?? "")" : "Balance not reported")
+    }
+}
+
 struct BrandIcon: View {
     let provider: String
 
@@ -301,7 +321,7 @@ struct BrandIcon: View {
         switch provider {
         case "codex": return "brand-openai"
         case "claude": return "brand-claude"
-        case "opencode", "deepseek": return "brand-deepseek"
+        case "dsh", "opencode", "deepseek": return "brand-deepseek"
         default: return "brand-anthropic"
         }
     }

@@ -115,6 +115,18 @@ struct SettingsView: View {
 
     private func usageLine(_ agent: Agent) -> String {
         var parts: [String] = []
+        // Pre-paid accounts (DeepSeek) report a balance; there are no usage windows to show.
+        if let balance = agent.usage?.balance {
+            let amounts = balance.walletAmounts
+            parts.append(amounts.isEmpty ? "Balance not reported" : "Balance \(amounts.joined(separator: " · "))")
+            if let updated = TimeFormat.date(balance.updatedAt ?? "") {
+                parts.append("as of \(updated.formatted(date: .abbreviated, time: .shortened))")
+            } else if let reason = balance.reason, !reason.isEmpty {
+                parts.append(reason)
+            }
+            if let source = balance.source, !source.isEmpty { parts.append(source) }
+            return parts.joined(separator: " · ")
+        }
         if let fiveHour = agent.usage?.fiveHour { parts.append("5-hour \(Int(fiveHour))%") }
         if let weekly = agent.usage?.weekly { parts.append("Weekly \(Int(weekly))%") }
         if let reset = agent.usage?.resetAt, let date = TimeFormat.date(reset) {

@@ -30,7 +30,14 @@ enum TestFixtures {
         let events = [LiveEvent(id: "latest-command", kind: "tool", title: "Inspect current work", time: "2026-09-29T21:01:01Z", status: "completed", action: "command")]
         let finished = TaskStatus(kind: "completed", label: "Finished", detail: "Current work has been checked.", at: "2026-09-29T21:01:02Z", eventId: "fixture-finished")
         model.agents = [
-            Agent(id: "fixture", label: "OpenCode", account: "Test fixture", provider: "opencode", state: "idle", statusSummary: finished, connection: AgentConnection(ready: true), messages: messages, events: events),
+            Agent(id: "fixture", label: "Flint", account: "DeepSeek Harness", provider: "dsh", state: "idle",
+                  statusSummary: finished, connection: AgentConnection(ready: true),
+                  usage: AgentUsage(activity: "Terrain QA", weekly: nil, fiveHour: nil, updatedAt: stamp,
+                                    source: "DeepSeek balance", resetAt: nil,
+                                    balance: AgentBalance(available: true, currency: "USD", total: "12.34",
+                                                          granted: "0.00", toppedUp: "12.34",
+                                                          source: "DeepSeek /user/balance", updatedAt: stamp, reason: nil)),
+                  messages: messages, events: events),
             Agent(id: "working", label: "Astra", provider: "codex", state: "working", execution: Execution(label: "Inspecting code"), connection: AgentConnection(ready: true))
         ]
         model.selectedId = "fixture"

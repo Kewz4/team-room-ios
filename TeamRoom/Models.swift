@@ -1,5 +1,65 @@
 import Foundation
 
+/// One pre-paid wallet. A DeepSeek account can hold several, one per currency.
+struct AgentWallet: Codable, Hashable {
+    var currency: String?
+    var total: String?
+    var granted: String?
+    var toppedUp: String?
+
+    var hasAmount: Bool {
+        !(total ?? "").trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    var displayAmount: String? {
+        guard let raw = total?.trimmingCharacters(in: .whitespaces), !raw.isEmpty else { return nil }
+        return AgentWallet.money(raw, currency)
+    }
+
+    /// "$4.32" when the currency code is known, otherwise the raw amount with its code.
+    static func money(_ raw: String, _ currency: String?) -> String {
+        let code = (currency ?? "").trimmingCharacters(in: .whitespaces).uppercased()
+        guard let value = Decimal(string: raw, locale: Locale(identifier: "en_US_POSIX")) else {
+            return code.isEmpty ? raw : "\(raw) \(code)"
+        }
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = code.isEmpty ? "USD" : code
+        return formatter.string(from: value as NSDecimalNumber) ?? (code.isEmpty ? raw : "\(raw) \(code)")
+    }
+}
+
+/// DeepSeek accounts are pre-paid, so the bridge reports an account balance instead of usage windows.
+struct AgentBalance: Codable, Hashable {
+    var available: Bool?
+    var currency: String?
+    var total: String?
+    var granted: String?
+    var toppedUp: String?
+    var source: String?
+    var updatedAt: String?
+    var reason: String?
+    var wallets: [AgentWallet]?
+}
+
+extension AgentBalance {
+    var hasAmount: Bool {
+        !(total ?? "").trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    var displayAmount: String? {
+        guard let raw = total?.trimmingCharacters(in: .whitespaces), !raw.isEmpty else { return nil }
+        return AgentWallet.money(raw, currency)
+    }
+
+    /// Every wallet the account holds, primary first; the primary amount alone when none are listed.
+    var walletAmounts: [String] {
+        let listed = (wallets ?? []).compactMap { $0.displayAmount }
+        if !listed.isEmpty { return listed }
+        return displayAmount.map { [$0] } ?? []
+    }
+}
+
 struct AgentUsage: Codable, Hashable {
     var activity: String?
     var weekly: Double?
@@ -7,9 +67,10 @@ struct AgentUsage: Codable, Hashable {
     var updatedAt: String?
     var source: String?
     var resetAt: String?
+    var balance: AgentBalance?
 
     private enum CodingKeys: String, CodingKey {
-        case activity, weekly, fiveHour, updatedAt, source, resetAt
+        case activity, weekly, fiveHour, updatedAt, source, resetAt, balance
     }
 }
 
@@ -21,6 +82,7 @@ extension AgentUsage {
         fiveHour = try values.decodeIfPresent(Double.self, forKey: .fiveHour)
         source = try values.decodeIfPresent(String.self, forKey: .source)
         resetAt = try values.decodeIfPresent(String.self, forKey: .resetAt)
+        balance = try values.decodeIfPresent(AgentBalance.self, forKey: .balance)
         if !values.contains(.updatedAt) {
             updatedAt = nil
         } else if try values.decodeNil(forKey: .updatedAt) {
