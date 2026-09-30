@@ -47,7 +47,16 @@ final class TeamRoomUITests: XCTestCase {
         editor.tap()
         editor.typeText(" revised")
         app.buttons["Save changes"].tap()
-        row.swipeLeft()
+        let editorDismissed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: editor)
+        XCTAssertEqual(XCTWaiter.wait(for: [editorDismissed], timeout: 8), .completed)
+        XCTAssertTrue(app.staticTexts["Edited · ready to retry"].waitForExistence(timeout: 5))
+        // Swipe the noninteractive message body after the editor settles, rather than
+        // the entire cell whose center can overlap the independent Retry control.
+        let body = app.staticTexts["delivery-body-fixture-failed"]
+        let bodyVisible = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: body)
+        XCTAssertEqual(XCTWaiter.wait(for: [bodyVisible], timeout: 5), .completed)
+        body.swipeLeft()
+        XCTAssertTrue(app.buttons["Delete"].waitForExistence(timeout: 5))
         app.buttons["Delete"].tap()
         XCTAssertTrue(app.buttons["Undo delete"].waitForExistence(timeout: 5))
         capture("delivery-delete-undo", app)
