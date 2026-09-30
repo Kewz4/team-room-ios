@@ -7,6 +7,39 @@ struct AgentUsage: Codable, Hashable {
     var updatedAt: String?
     var source: String?
     var resetAt: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case activity, weekly, fiveHour, updatedAt, source, resetAt
+    }
+}
+
+extension AgentUsage {
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        activity = try values.decodeIfPresent(String.self, forKey: .activity)
+        weekly = try values.decodeIfPresent(Double.self, forKey: .weekly)
+        fiveHour = try values.decodeIfPresent(Double.self, forKey: .fiveHour)
+        source = try values.decodeIfPresent(String.self, forKey: .source)
+        resetAt = try values.decodeIfPresent(String.self, forKey: .resetAt)
+        if !values.contains(.updatedAt) {
+            updatedAt = nil
+        } else if try values.decodeNil(forKey: .updatedAt) {
+            updatedAt = nil
+        } else if let timestamp = try? values.decode(String.self, forKey: .updatedAt) {
+            updatedAt = timestamp
+        } else {
+            // Older bridges returned fs.stat's Unix epoch milliseconds, including fractions.
+            let milliseconds = try values.decode(Double.self, forKey: .updatedAt)
+            guard milliseconds.isFinite, milliseconds >= -62135596800000,
+                  milliseconds < 253402300800000 else {
+                throw DecodingError.dataCorruptedError(forKey: .updatedAt, in: values,
+                    debugDescription: "Usage timestamp is outside the supported ISO date range.")
+            }
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            updatedAt = formatter.string(from: Date(timeIntervalSince1970: milliseconds / 1000))
+        }
+    }
 }
 
 struct AgentConnection: Codable, Hashable {

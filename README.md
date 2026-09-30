@@ -36,7 +36,7 @@ This repo does not hold certificates or provisioning profiles. Sign on your devi
 The tunnel hostname is temporary (Cloudflare Quick Tunnel): if it changes after a tunnel restart, create a fresh device
 link and paste it again; the app re-pairs in place.
 
-## What it does today (v0.5.0)
+## What it does today (v0.5.1)
 
 - Hamburger teammate drawer with brand icons (DeepSeek / OpenAI / Claude), state dots, and usage-window bars
   (5-hour + weekly, colored by pressure) wherever the server reports them.
@@ -71,6 +71,12 @@ link and paste it again; the app re-pairs in place.
 - iPhone/iPad on iOS 26 or later (built against the latest iOS SDK; iOS 26 is the Liquid Glass baseline).
 - The PC side: Team Room server + tunnel running (`start-remote.ps1`) and reachable.
 
+
+## 0.5.1 — usage timestamp compatibility
+
+Accepts the legacy numeric usage timestamp returned by older bridges as Unix epoch milliseconds,
+while preserving string, null and absent timestamps. Incompatible JSON identifies the endpoint
+and field without showing response bodies or credentials. No pairing reset is needed for this fix.
 
 ## 0.5.0 — task feedback and conversation fixes
 

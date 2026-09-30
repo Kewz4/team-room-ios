@@ -12,6 +12,32 @@ struct ClientError: LocalizedError {
     var errorDescription: String? { message }
 }
 
+enum ResponseDecoder {
+    static func decode<T: Decodable>(_ type: T.Type, from data: Data, endpoint: URL) throws -> T {
+        do {
+            return try JSONDecoder().decode(type, from: data)
+        } catch {
+            var keys: [CodingKey] = []
+            switch error {
+            case DecodingError.typeMismatch(_, let context),
+                 DecodingError.valueNotFound(_, let context),
+                 DecodingError.dataCorrupted(let context): keys = context.codingPath
+            case DecodingError.keyNotFound(let key, let context): keys = context.codingPath + [key]
+            default: break
+            }
+            let field = keys.reduce("") { path, key in
+                if let index = key.intValue { return path + "[\(index)]" }
+                // Do not echo arbitrary dictionary keys, response bodies or decoder descriptions.
+                let safe = key.stringValue.range(of: "^[A-Za-z][A-Za-z0-9_]{0,63}$", options: .regularExpression) != nil
+                let name = safe ? key.stringValue : "field"
+                return path.isEmpty ? name : path + "." + name
+            }
+            let location = field.isEmpty ? "response" : field
+            throw ClientError(message: "Unexpected response from \(endpoint.path) at \(location).")
+        }
+    }
+}
+
 actor TeamRoomClient {
     nonisolated let session: URLSession
     private(set) var baseURL: URL?
@@ -250,10 +276,7 @@ actor TeamRoomClient {
     private func perform<T: Decodable>(_ request: URLRequest, as type: T.Type) async throws -> T {
         let data = try await data(for: request)
         if type == Empty.self { return Empty() as! T }
-        do {
-            return try JSONDecoder().decode(T.self, from: data)
-        } catch {
-            throw ClientError(message: "Unexpected response from the Team Room server.")
-        }
+        guard let endpoint = request.url else { throw ClientError(message: "Server URL is not valid.") }
+        return try ResponseDecoder.decode(type, from: data, endpoint: endpoint)
     }
 }
