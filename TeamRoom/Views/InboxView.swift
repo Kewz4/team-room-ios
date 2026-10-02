@@ -29,7 +29,7 @@ struct InboxView: View {
                         }
                         ForEach(decisions) { decision in
                             Button { model.router.tab = .board } label: {
-                                InboxRow(worker: "kewz", title: decision.title, detail: decision.detail ?? "Decision for you on the board.", icon: "checklist", tint: Tokens.accent)
+                                InboxRow(worker: "kewz", title: decision.title, detail: decision.detail ?? "Decision for you on the board.", icon: "arrow.right", tint: Tokens.accent)
                             }
                             .buttonStyle(.plain)
                         }
@@ -101,7 +101,16 @@ struct InboxRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             ZStack(alignment: .bottomTrailing) {
-                AgentAvatar(worker: worker, size: 30)
+                if worker == "kewz" {
+                    // Kewz's own decisions: a decision mark, not a "You" avatar.
+                    Image(systemName: "checklist")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Tokens.accent)
+                        .frame(width: 30, height: 30)
+                        .background(Tokens.accentSoft, in: Circle())
+                } else {
+                    AgentAvatar(worker: worker, size: 30)
+                }
                 Image(systemName: icon)
                     .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(.white)

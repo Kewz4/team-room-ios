@@ -131,8 +131,45 @@ struct MarkdownTableView: View {
     let cells: [[AttributedString]]
 
     var body: some View {
+        if table.headers.count <= 3 {
+            fittedGrid
+        } else {
+            scrollingTable
+        }
+    }
+
+    /// Up to three columns fit the screen: columns share the width and long cells wrap.
+    private var fittedGrid: some View {
+        Grid(alignment: .topLeading, horizontalSpacing: 0, verticalSpacing: 0) {
+            ForEach(0..<cells.count, id: \.self) { index in
+                if index > 0 {
+                    Rectangle().fill(Tokens.hairline).frame(height: 1).gridCellUnsizedAxes(.horizontal)
+                }
+                GridRow {
+                    ForEach(table.headers.indices, id: \.self) { column in
+                        let value = column < cells[index].count ? cells[index][column] : AttributedString()
+                        Text(value)
+                            .font(index == 0 ? .subheadline.weight(.semibold) : .subheadline)
+                            .foregroundStyle(Tokens.textPrimary)
+                            .multilineTextAlignment(textAlignment(column))
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 9)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: alignment(column))
+                            .background(index == 0 ? Tokens.surfaceAlt : Color.clear)
+                            .accessibilityLabel(index == 0 ? table.headers[column] : "\(table.headers[column]): \(String(value.characters))")
+                    }
+                }
+            }
+        }
+        .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.s).stroke(Tokens.hairline, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: Tokens.Radius.s))
+        .accessibilityIdentifier("markdown-table")
+    }
+
+    private var scrollingTable: some View {
         let widths = table.headers.indices.map(columnWidth)
-        ScrollView(.horizontal) {
+        return ScrollView(.horizontal) {
             VStack(spacing: 0) {
                 row(0, header: true, widths: widths)
                     .background(Tokens.surfaceAlt)

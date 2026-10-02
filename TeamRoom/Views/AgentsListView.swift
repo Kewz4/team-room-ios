@@ -13,17 +13,18 @@ struct AgentsListView: View {
                     Section {
                         ForEach(model.team.needsInput) { agent in
                             NavigationLink(value: agent.id) {
-                                Label {
+                                HStack(alignment: .top, spacing: 10) {
+                                    Image(systemName: "hand.raised.fill")
+                                        .foregroundStyle(Tokens.working)
+                                        .accessibilityHidden(true)
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text("\(agent.displayName) needs your input")
                                             .font(.subheadline.weight(.semibold))
                                         Text(agent.prompts?.first?.title ?? "Answer to let \(agent.displayName) continue")
                                             .font(TypeScale.caption)
                                             .foregroundStyle(Tokens.textSecondary)
-                                            .lineLimit(2)
+                                            .lineLimit(3)
                                     }
-                                } icon: {
-                                    Image(systemName: "hand.raised.fill").foregroundStyle(Tokens.working)
                                 }
                             }
                         }
@@ -63,26 +64,31 @@ struct AgentsListView: View {
 
 struct AgentRow: View {
     let agent: Agent
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         let worker = AgentStyle.worker(for: agent)
+        let header = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2)) : AnyLayout(HStackLayout(spacing: 6))
         HStack(alignment: .top, spacing: 12) {
             AgentAvatar(worker: worker, size: 42, state: agent.state, showRing: true)
                 .padding(.top, 2)
             VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
+                header {
                     Text(agent.displayName)
                         .font(.headline)
                         .foregroundStyle(Tokens.textPrimary)
+                        .lineLimit(1)
+                        .layoutPriority(1)
                     Text(agent.account ?? "")
                         .font(TypeScale.caption)
                         .foregroundStyle(Tokens.textTertiary)
                         .lineLimit(1)
-                    Spacer(minLength: 4)
+                    if !typeSize.isAccessibilitySize { Spacer(minLength: 4) }
                     if let time = agent.lastMessage?.time ?? agent.lastEventAt {
                         RelativeTimeText(iso: time)
                             .font(TypeScale.caption)
                             .foregroundStyle(Tokens.textTertiary)
+                            .fixedSize()
                     }
                 }
                 Text(statusLine)

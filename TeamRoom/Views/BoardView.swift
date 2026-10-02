@@ -152,12 +152,30 @@ struct BoardView: View {
         let units = report.work?.columns.units(column) ?? []
         return BoardSection(title: "Work board", systemImage: "rectangle.split.3x1") {
             VStack(alignment: .leading, spacing: 10) {
-                Picker("Column", selection: $column) {
-                    ForEach(columns, id: \.0) { item in
-                        Text("\(item.1) \(report.work?.totals?[item.0] ?? 0)").tag(item.0)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(columns, id: \.0) { item in
+                            let selected = column == item.0
+                            Button {
+                                column = item.0
+                            } label: {
+                                HStack(spacing: 5) {
+                                    Text(item.1)
+                                    Text("\(report.work?.totals?[item.0] ?? 0)")
+                                        .monospacedDigit()
+                                        .foregroundStyle(selected ? Color.white.opacity(0.85) : Tokens.textTertiary)
+                                }
+                                .font(.subheadline.weight(.medium))
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 7)
+                                .foregroundStyle(selected ? Color.white : Tokens.textPrimary)
+                                .background(selected ? Tokens.accent : Tokens.surfaceAlt, in: Capsule())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityAddTraits(selected ? .isSelected : [])
+                        }
                     }
                 }
-                .pickerStyle(.segmented)
                 .accessibilityIdentifier("work-columns")
                 if units.isEmpty {
                     Text(emptyText)
@@ -212,6 +230,7 @@ struct ProgressRing: View {
     var line: CGFloat = 10
     var color: Color = Tokens.accent
     @State private var shown: Double = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack {
@@ -230,8 +249,12 @@ struct ProgressRing: View {
             }
         }
         .frame(width: size, height: size)
-        .onAppear { withAnimation(.easeOut(duration: 0.8)) { shown = Double(percent) / 100 } }
-        .onChange(of: percent) { _, value in withAnimation(.easeOut(duration: 0.5)) { shown = Double(value) / 100 } }
+        .onAppear {
+            if reduceMotion { shown = Double(percent) / 100 } else { withAnimation(.easeOut(duration: 0.8)) { shown = Double(percent) / 100 } }
+        }
+        .onChange(of: percent) { _, value in
+            if reduceMotion { shown = Double(value) / 100 } else { withAnimation(.easeOut(duration: 0.5)) { shown = Double(value) / 100 } }
+        }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Overall progress \(percent) percent")
     }
@@ -414,8 +437,11 @@ struct ThroughputChart: View {
 struct LoreChart: View {
     let regions: [RegionCount]
 
+    private var target: Int { regions.first?.target ?? 20 }
+    /// Rounded up to the next ten so the last axis label is never clipped.
+    private var upper: Int { ((max(target + 8, (regions.map(\.count).max() ?? 0) + 4) + 9) / 10) * 10 }
+
     var body: some View {
-        let target = regions.first?.target ?? 20
         Chart {
             ForEach(regions) { region in
                 BarMark(x: .value("Quests", region.count), y: .value("Region", region.label ?? region.region))
@@ -428,13 +454,24 @@ struct LoreChart: View {
             RuleMark(x: .value("Target", target))
                 .foregroundStyle(Tokens.textTertiary)
                 .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 3]))
-                .annotation(position: .top, alignment: .trailing) {
-                    Text("target \(target)").font(.caption2).foregroundStyle(Tokens.textTertiary)
-                }
         }
-        .chartXScale(domain: 0...max(target + 8, (regions.map(\.count).max() ?? 0) + 4))
+        .chartXScale(domain: 0...upper)
+        .chartXAxis {
+            AxisMarks(values: Array(stride(from: 0, to: upper, by: 10))) { _ in
+                AxisGridLine()
+                AxisValueLabel()
+            }
+        }
+        .chartYAxis {
+            AxisMarks(position: .leading) { _ in
+                AxisValueLabel()
+            }
+        }
         .frame(height: CGFloat(regions.count) * 26 + 24)
         .accessibilityLabel("Lore quests per region against a target of \(target)")
+        Text("Dashed line: the \(target)-quest target per region.")
+            .font(.caption2)
+            .foregroundStyle(Tokens.textTertiary)
     }
 }
 
@@ -610,9 +647,12 @@ struct GoalDetailView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(goal.title).font(.headline)
                                 if let owner = goal.owner {
-                                    Label(goal.ownerName ?? AgentStyle.displayName(owner), systemImage: "person.fill")
-                                        .font(TypeScale.caption)
-                                        .foregroundStyle(Tokens.textSecondary)
+                                    HStack(spacing: 6) {
+                                        AgentAvatar(worker: owner, size: 18)
+                                        Text(goal.ownerName ?? AgentStyle.displayName(owner))
+                                            .font(TypeScale.caption)
+                                            .foregroundStyle(Tokens.textSecondary)
+                                    }
                                 }
                                 if let method = goal.method {
                                     Text(method).font(.caption2).foregroundStyle(Tokens.textTertiary)

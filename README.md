@@ -36,45 +36,45 @@ This repo does not hold certificates or provisioning profiles. Sign on your devi
 The tunnel hostname is temporary (Cloudflare Quick Tunnel): if it changes after a tunnel restart, create a fresh device
 link and paste it again; the app re-pairs in place.
 
-## What it does today (v0.6.0)
+## What it does (1.0)
 
-- Hamburger teammate drawer with brand icons (DeepSeek / OpenAI / Claude), state dots, and usage-window bars
-  (5-hour + weekly, colored by pressure) wherever the server reports them.
-- **Pre-paid accounts show a balance instead of usage windows.** Flint runs on the DeepSeek Harness, whose account
-  reports money rather than percentages, so his row shows a compact balance chip and Settings lists every wallet the
-  account holds (a multi-currency account can have more than one) with its source and freshness. Nothing about the
-  key behind that number reaches the phone: the bridge resolves it on the PC and sends only the amount.
-- Real conversation view: transcript messages, live streaming reply text, and compact **activity dropdowns**
-  ("Used 2 tools, ran 3 commands ›") that expand into one-line tool rows with full detail sheets.
-- Inline image previews from `/api/media` (cookie-authenticated, downsampled, bounded cache) with a full-screen viewer.
-- **Decision cards**: when a Codex teammate asks a question (one or many), requests a command/file approval, or asks
-  for extra sandbox permissions, a card pins above the composer — options, free-text "other", approve/deny, allow-once
-  vs allow-session — and the answer travels back through the bridge (`POST /api/prompt-response`).
-  The bridge also routes Claude and OpenCode decision prompts.
-- Scroll-to-bottom control that appears when you scroll back through history.
-- Delivery queue with states (queued, waiting for busy/connection), cancel, retry, and **Stop this turn**.
-- Live updates over `/live` WebSocket (coalesced frames) with a slow safety poll; polling pauses in the background.
-- Warm-neutral design system with one pine accent, light/dark tokens, 8pt grid, SF Symbols only.
-- Pairing/security: device-link sign-in only, cookie in Keychain, no credentials or links in the repo.
+Five tabs, Liquid Glass, one colour per teammate (Polaris gold, Nova violet, Atlas blue, Scout teal, Flint orange,
+Sage green):
 
-## Remaining setup
+- **Team** — the team chat. Ask anything about the team; Polaris answers first, then Nova, then Atlas, whoever is free.
+  Each answers from its own desk conversation with a live team digest, streams the answer, and shows why it answered
+  when a question was handed over ("Nova is answering because Polaris is answering another question"). Stop, ask
+  again, @mention a coordinator, suggestion chips, copy / select / share on long-press.
+- **Agents** — every teammate's room like a messages list (state ring, what they are doing now, latest message,
+  relay queue, holds, usage or balance, usage-limit pause). Each room shows the real conversation with grouped tool
+  activity, the reply streaming live, decision cards (questions, approvals, permissions), the delivery queue and a
+  composer.
+- **Board** — overall progress ring; decisions waiting on Kewz; who is doing what right now; goals → milestones →
+  tasks from `team-hub/PLAN.json`; charts of finished work per day by teammate, lore quests per region against the
+  20-per-region target and the quest-engine milestones; a live work board (running / queued / blocked / done / failed).
+- **Notes** — personal notes, saved on the phone instantly and synced to the PC; private unless shared with the
+  coordinators (then the team chat can read them). Pin, search, swipe.
+- **Inbox** — what needs you (decisions, questions, failed deliveries) and the updates feed. Settings is the gear in
+  every tab.
 
-- Closed-app push needs a push-enabled signing profile and matching APNs provider credentials on the PC. The app
-  shows the actual registration/setup result in Settings; delivery must still be checked on the signed iPhone.
-- Message search is not included.
+**Background notifications** arrive through **Bark** (free App Store app, end-to-end encrypted with AES-256-GCM): set
+up in Settings → Background notifications (install Bark, paste its key, enter the shown key in Bark's Push Encryption,
+send a test). Tapping a notification opens the right screen via `teamroom://` links. While the app is open it shows
+alerts itself and the PC holds the pushes.
 
-## API used
+**Speed and stability.** Lazy chat rows; Markdown rendered once and cached off the main thread; the v2 bridge API
+(10 KB team summaries instead of a ~1 MB state on every change, ETag-revalidated conversations, streamed text as small
+deltas only for the conversation on screen); ImageIO-downsampled images in a memory-capped cache; instant launch from
+the last saved state; reconnect with backoff, a network-path monitor and a 50-second liveness watchdog; per-field
+decoding so one bad value can never blank the app; a permanent address (Tailscale) and 30-day sliding sessions so the
+phone stays paired.
 
-`GET /api/health`, `POST /api/signin`, `GET /api/session`, `GET /api/state?agentId=`, `POST /api/messages`,
-`POST /api/cancel-message`, `POST /api/retry`, `POST /api/stop`, `POST /api/refresh-connections`,
-`POST /api/device-link`, `POST /api/signout`, `GET /api/event`, WebSocket `/live`. All requests carry the
-`kewz_session` cookie and the server origin as `Origin`.
+## QA
 
-## Requirements
-
-- iPhone/iPad on iOS 26 or later (built against the latest iOS SDK; iOS 26 is the Liquid Glass baseline).
-- The PC side: Team Room server + tunnel running (`start-remote.ps1`) and reachable.
-
+CI runs unit tests (decoding, deltas, deep links, notes merge, stores), performance tests (conversation build, Markdown
+rendering, payload decoding with clock and memory metrics; scroll hitch rate and launch time in the simulator) and UI
+tests that capture every screen populated with the real team and board numbers — light, dark and an accessibility text
+size. Screenshots and `results-and-metrics.txt` are in the `TeamRoom-qa` artifact of every run.
 
 ## 0.6.0 — DeepSeek balance and the harness teammate
 

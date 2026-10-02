@@ -38,12 +38,23 @@ struct ChatScroll<Content: View>: View {
             .accessibilityIdentifier("conversation-scroll")
             .defaultScrollAnchor(.bottom, for: .initialOffset)
             .scrollDismissesKeyboard(.interactively)
+            .scrollEdgeEffectStyle(.hard, for: .top)
             .onScrollGeometryChange(for: Bool.self) { geometry in
-                geometry.contentSize.height + geometry.contentInsets.bottom
-                    - geometry.contentOffset.y - geometry.containerSize.height < 80
+                // Distance from the deepest reachable offset; short content (nothing to scroll) counts as at the bottom.
+                let maxOffset = max(-geometry.contentInsets.top,
+                                    geometry.contentSize.height + geometry.contentInsets.bottom - geometry.containerSize.height)
+                return maxOffset - geometry.contentOffset.y < 80
             } action: { _, value in
                 atBottom = value
                 if userScrolling { following = value }
+            }
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                geometry.contentSize.height
+            } action: { old, new in
+                // Lazy rows measure themselves after the first layout and answers grow while streaming:
+                // keep the newest line in view while following.
+                guard new > old, following, !userScrolling else { return }
+                handle.bottom()
             }
             .onScrollPhaseChange { _, phase in
                 if phase == .tracking || phase == .interacting || phase == .decelerating {

@@ -157,6 +157,19 @@ final class TeamRoomTests: XCTestCase {
         XCTAssertEqual(store.workingCount, 1)
     }
 
+    func testFastTimestampParserMatchesTheSystemFormatter() {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let plain = ISO8601DateFormatter()
+        for value in ["2026-10-02T03:30:00.000Z", "2026-02-28T23:59:59.999Z", "2024-02-29T12:00:00.5Z", "1999-12-31T00:00:00.123456Z"] {
+            XCTAssertEqual(TimeFormat.fastUTC(value)!.timeIntervalSince1970, formatter.date(from: value)!.timeIntervalSince1970, accuracy: 0.001, value)
+        }
+        XCTAssertEqual(TimeFormat.fastUTC("2026-10-02T03:30:00Z")!.timeIntervalSince1970, plain.date(from: "2026-10-02T03:30:00Z")!.timeIntervalSince1970)
+        XCTAssertNil(TimeFormat.fastUTC("2026-10-02T03:30:00+02:00"), "offsets fall back to the formatter")
+        XCTAssertNotNil(TimeFormat.date("2026-10-02T03:30:00+02:00"))
+        XCTAssertNil(TimeFormat.fastUTC("not a date at all!!!"))
+    }
+
     // MARK: - Performance (numbers land in the CI log and the QA report)
 
     func testPerformanceBuildingALongConversation() {

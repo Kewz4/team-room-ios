@@ -85,20 +85,21 @@ struct TeamChatView: View {
     }
 
     private var defaultCoordinators: [Coordinator] {
-        [Coordinator(name: "nova", label: "Nova"), Coordinator(name: "atlas", label: "Atlas")]
+        [Coordinator(name: "polaris", label: "Polaris"), Coordinator(name: "nova", label: "Nova"), Coordinator(name: "atlas", label: "Atlas")]
     }
 
     private var emptyState: some View {
         VStack(alignment: .leading, spacing: Tokens.Space.m) {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: -8) {
+                    AgentAvatar(worker: "polaris", size: 34)
                     AgentAvatar(worker: "nova", size: 34)
                     AgentAvatar(worker: "atlas", size: 34)
                 }
                 Text("Ask the team anything")
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(Tokens.textPrimary)
-                Text("Nova or Atlas answers — whoever is free — using the live state of every teammate, the plan and the board. Start with @Nova or @Atlas to pick one.")
+                Text("Polaris, Nova or Atlas answers — whoever is free — using the live state of every teammate, the plan and the board. Start with @Polaris, @Nova or @Atlas to pick one.")
                     .font(TypeScale.footnote)
                     .foregroundStyle(Tokens.textSecondary)
             }
@@ -129,6 +130,7 @@ struct TeamChatView: View {
             HStack(alignment: .bottom, spacing: Tokens.Space.s) {
                 Menu {
                     Button { addressee = nil } label: { Label("Whoever is free", systemImage: addressee == nil ? "checkmark" : "person.2") }
+                    Button { addressee = "polaris" } label: { Label("Polaris", systemImage: addressee == "polaris" ? "checkmark" : "person") }
                     Button { addressee = "nova" } label: { Label("Nova", systemImage: addressee == "nova" ? "checkmark" : "person") }
                     Button { addressee = "atlas" } label: { Label("Atlas", systemImage: addressee == "atlas" ? "checkmark" : "person") }
                 } label: {
@@ -254,7 +256,7 @@ struct RoomMessageRow: View, Equatable {
                     Button {
                         showClaim.toggle()
                     } label: {
-                        Image(systemName: "arrow.triangle.branch")
+                        Image(systemName: "info.circle")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(Tokens.textTertiary)
                             .frame(width: 32, height: 28)

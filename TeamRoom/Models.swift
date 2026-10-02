@@ -435,7 +435,47 @@ enum TimeFormat {
 
     static func date(_ value: String?) -> Date? {
         guard let value, !value.isEmpty else { return nil }
+        if let fast = fastUTC(value) { return fast }
         return iso.date(from: value) ?? isoPlain.date(from: value)
+    }
+
+    /// The bridge's own format, `yyyy-MM-ddTHH:mm:ss(.fraction)Z`, parsed by hand: ISO8601DateFormatter costs
+    /// ~80 µs per call, which dominated building long conversations (2,000 rows took ~170 ms).
+    static func fastUTC(_ value: String) -> Date? {
+        let u = Array(value.utf8)
+        guard u.count >= 20, u[4] == 45, u[7] == 45, u[10] == 84, u[13] == 58, u[16] == 58, u[u.count - 1] == 90 else { return nil }
+        func number(_ from: Int, _ to: Int) -> Int? {
+            var result = 0
+            for index in from..<to {
+                let digit = Int(u[index]) - 48
+                guard digit >= 0 && digit <= 9 else { return nil }
+                result = result * 10 + digit
+            }
+            return result
+        }
+        guard let year = number(0, 4), let month = number(5, 7), let day = number(8, 10),
+              let hour = number(11, 13), let minute = number(14, 16), let second = number(17, 19),
+              (1...12).contains(month), (1...31).contains(day), hour < 24, minute < 60, second < 61 else { return nil }
+        var fraction = 0.0
+        if u[19] == 46 {
+            var scale = 0.1
+            for index in 20..<(u.count - 1) {
+                let digit = Int(u[index]) - 48
+                guard digit >= 0 && digit <= 9 else { return nil }
+                fraction += Double(digit) * scale
+                scale /= 10
+            }
+        } else if u.count != 20 {
+            return nil
+        }
+        // Days from the civil date (Howard Hinnant's algorithm), proleptic Gregorian, UTC.
+        let y = month <= 2 ? year - 1 : year
+        let era = (y >= 0 ? y : y - 399) / 400
+        let yearOfEra = y - era * 400
+        let dayOfYear = (153 * ((month + 9) % 12) + 2) / 5 + day - 1
+        let dayOfEra = yearOfEra * 365 + yearOfEra / 4 - yearOfEra / 100 + dayOfYear
+        let days = era * 146097 + dayOfEra - 719468
+        return Date(timeIntervalSince1970: Double(days * 86400 + hour * 3600 + minute * 60 + second) + fraction)
     }
 
     static func relative(_ value: String?) -> String {
