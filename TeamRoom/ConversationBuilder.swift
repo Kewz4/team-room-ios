@@ -1,6 +1,6 @@
 import Foundation
 
-struct ActivityGroup: Identifiable {
+struct ActivityGroup: Identifiable, Hashable {
     let id: String
     var events: [LiveEvent]
 
@@ -33,7 +33,7 @@ struct ActivityGroup: Identifiable {
     }
 }
 
-enum ConversationItem: Identifiable {
+enum ConversationItem: Identifiable, Hashable {
     case message(ChatMessage)
     case activity(ActivityGroup)
 

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct PairView: View {
     @Environment(AppModel.self) private var model
@@ -7,54 +8,64 @@ struct PairView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Tokens.Space.l) {
-                VStack(alignment: .leading, spacing: Tokens.Space.xs) {
+                VStack(alignment: .leading, spacing: Tokens.Space.s) {
+                    HStack(spacing: -10) {
+                        ForEach(["nova", "atlas", "scout", "flint", "sage"], id: \.self) { worker in
+                            AgentAvatar(worker: worker, size: 40)
+                                .overlay(Circle().stroke(Tokens.background, lineWidth: 2))
+                        }
+                    }
                     Text("Team Room")
                         .font(TypeScale.screenTitle)
                         .foregroundStyle(Tokens.textPrimary)
-                    Text("Your private console for the local AI teammates, now native on iPhone.")
+                    Text("Your AI team, from anywhere: ask the team, follow each teammate, and see the whole project's progress.")
                         .font(TypeScale.body)
                         .foregroundStyle(Tokens.textSecondary)
                 }
 
                 VStack(alignment: .leading, spacing: Tokens.Space.s) {
                     step(1, "On the PC, open Team Room → Connection settings → Create device link.")
-                    step(2, "Copy the link and paste it below within 30 minutes. Each link works once.")
-                    step(3, "The session is kept in your iPhone Keychain; nothing is stored in the repo.")
+                    step(2, "Paste the link below within 30 minutes. Each link works once.")
+                    step(3, "This iPhone stays signed in as long as you use it at least once a month.")
                 }
 
                 VStack(alignment: .leading, spacing: Tokens.Space.s) {
-                    TextField("https://….trycloudflare.com/#pair=…", text: $input, axis: .vertical)
+                    TextField("https://…#pair=…", text: $input, axis: .vertical)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .keyboardType(.URL)
                         .font(TypeScale.mono)
                         .padding(Tokens.Space.m)
                         .background(Tokens.surface, in: RoundedRectangle(cornerRadius: Tokens.Radius.m, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: Tokens.Radius.m, style: .continuous)
-                                .stroke(Tokens.hairline, lineWidth: 0.5)
-                        )
+                        .overlay(RoundedRectangle(cornerRadius: Tokens.Radius.m, style: .continuous).stroke(Tokens.hairline, lineWidth: 0.5))
+                        .accessibilityIdentifier("pair-link")
 
-                    Button {
-                        Task { await model.pair(input) }
-                    } label: {
-                        HStack {
-                            Spacer()
-                            if model.pairingBusy {
-                                ProgressView().controlSize(.small)
-                            }
-                            Text("Connect").font(TypeScale.subhead)
-                            Spacer()
+                    HStack(spacing: Tokens.Space.s) {
+                        PasteButton(payloadType: String.self) { strings in
+                            if let text = strings.first { input = text }
                         }
-                        .frame(height: 44)
+                        .buttonBorderShape(.capsule)
+                        .labelStyle(.titleAndIcon)
+
+                        Button {
+                            Task { await model.pair(input) }
+                        } label: {
+                            HStack {
+                                Spacer()
+                                if model.pairingBusy { ProgressView().controlSize(.small) }
+                                Text("Connect").font(TypeScale.subhead)
+                                Spacer()
+                            }
+                            .frame(height: 44)
+                        }
+                        .buttonStyle(.glassProminent)
+                        .tint(Tokens.accent)
+                        .disabled(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.pairingBusy)
                     }
-                    .buttonStyle(.glassProminent)
-                    .tint(Tokens.accent)
-                    .disabled(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.pairingBusy)
                 }
 
                 if let error = model.pairingError {
-                    Text(error)
+                    Label(error, systemImage: "exclamationmark.triangle")
                         .font(TypeScale.caption)
                         .foregroundStyle(Tokens.failure)
                 }
@@ -69,10 +80,10 @@ struct PairView: View {
             Text("\(number)")
                 .font(TypeScale.captionMedium)
                 .foregroundStyle(Tokens.accent)
-                .frame(width: 20, height: 20)
+                .frame(width: 22, height: 22)
                 .background(Tokens.accentSoft, in: Circle())
             Text(text)
-                .font(TypeScale.caption)
+                .font(TypeScale.footnote)
                 .foregroundStyle(Tokens.textSecondary)
         }
     }

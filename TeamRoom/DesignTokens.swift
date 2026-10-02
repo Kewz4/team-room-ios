@@ -34,18 +34,20 @@ enum Tokens {
     static let accent = Color(light: "2F6E57", dark: "5CB894")
     static let accentSoft = Color(light: "E4F0EA", dark: "1B342B")
 
-    static let background = Color(light: "F7F6F3", dark: "121315")
-    static let surface = Color(light: "FFFFFF", dark: "1C1D20")
-    static let surfaceAlt = Color(light: "EDECE7", dark: "232529")
+    static let background = Color(light: "F7F6F3", dark: "111214")
+    static let surface = Color(light: "FFFFFF", dark: "1B1C1F")
+    static let surfaceAlt = Color(light: "EFEEE9", dark: "24262A")
     static let hairline = Color(light: "E2E0D9", dark: "2F3136")
+    static let userBubble = Color(light: "E7F1EC", dark: "1F3A30")
 
     static let textPrimary = Color(light: "1B1C1E", dark: "F1F1F2")
-    static let textSecondary = Color(light: "6E6B63", dark: "9C9C9F")
-    static let textTertiary = Color(light: "9C988E", dark: "6C6D71")
+    static let textSecondary = Color(light: "6E6B63", dark: "A3A3A7")
+    static let textTertiary = Color(light: "9C988E", dark: "6F7075")
 
     static let working = Color(light: "B4560A", dark: "E8A24C")
     static let idle = Color(light: "3E8E6E", dark: "6FC49D")
     static let failure = Color(light: "B3382C", dark: "E06A5E")
+    static let info = Color(light: "2F64B4", dark: "7DA8F0")
 
     enum Space {
         static let hair: CGFloat = 2
@@ -60,16 +62,68 @@ enum Tokens {
         static let s: CGFloat = 8
         static let m: CGFloat = 12
         static let l: CGFloat = 18
+        static let xl: CGFloat = 24
     }
 }
 
+/// Dynamic Type text styles, so the whole app follows the iPhone's text size setting.
 enum TypeScale {
-    static let screenTitle = Font.system(size: 28, weight: .semibold)
-    static let title = Font.system(size: 17, weight: .semibold)
-    static let body = Font.system(size: 16)
-    static let subhead = Font.system(size: 15, weight: .medium)
-    static let caption = Font.system(size: 12)
-    static let captionMedium = Font.system(size: 12, weight: .medium)
-    static let mono = Font.system(size: 12, design: .monospaced)
-    static let monoSmall = Font.system(size: 11, design: .monospaced)
+    static let screenTitle = Font.largeTitle.weight(.semibold)
+    static let title = Font.headline
+    static let body = Font.body
+    static let subhead = Font.subheadline.weight(.medium)
+    static let caption = Font.caption
+    static let captionMedium = Font.caption.weight(.medium)
+    static let footnote = Font.footnote
+    static let mono = Font.system(.footnote, design: .monospaced)
+    static let monoSmall = Font.system(.caption2, design: .monospaced)
+    static let number = Font.system(.title2, design: .rounded).weight(.semibold)
+}
+
+/// Each teammate keeps one colour everywhere: avatars, charts, board lanes and notifications.
+enum AgentStyle {
+    static func worker(for agent: Agent) -> String {
+        if let worker = agent.worker, !worker.isEmpty { return worker }
+        return worker(forId: agent.id)
+    }
+
+    static func worker(forId id: String) -> String {
+        switch id {
+        case "claude-assets": return "nova"
+        case "gpt-world": return "atlas"
+        case "gpt-assets": return "scout"
+        case "opencode-world": return "flint"
+        case "claude-adventure": return "sage"
+        case "claude-polaris": return "polaris"
+        default: return id
+        }
+    }
+
+    static func color(_ worker: String?) -> Color {
+        switch (worker ?? "").lowercased() {
+        case "polaris": return Color(light: "B8860B", dark: "F2C14E")
+        case "nova": return Color(light: "6E4CF5", dark: "9C85FF")
+        case "atlas": return Color(light: "2563D9", dark: "6EA2FF")
+        case "scout": return Color(light: "0F8F78", dark: "45C9AA")
+        case "flint": return Color(light: "D9621A", dark: "FF9A52")
+        case "sage": return Color(light: "3F8A3B", dark: "7FC874")
+        case "kewz", "you": return Tokens.accent
+        case "coordinator": return Color(light: "5B6472", dark: "A8B0BC")
+        default: return Tokens.textSecondary
+        }
+    }
+
+    static func displayName(_ worker: String?) -> String {
+        guard let worker, !worker.isEmpty else { return "Teammate" }
+        if worker == "kewz" { return "You" }
+        return worker.prefix(1).uppercased() + worker.dropFirst()
+    }
+
+    static func stateColor(_ state: String?) -> Color {
+        switch state {
+        case "working": return Tokens.working
+        case "idle": return Tokens.idle
+        default: return Tokens.textTertiary
+        }
+    }
 }

@@ -206,22 +206,84 @@ enum MarkdownBlocks {
     }
 }
 
-@MainActor
-final class MarkdownCache {
-    static let shared = MarkdownCache()
-    private var storage: [String: [MarkdownBlocks.Block]] = [:]
-    private var order: [String] = []
+/// One parsed block with its inline Markdown already converted to an AttributedString.
+struct RenderedBlock: Identifiable {
+    enum Kind {
+        case heading(Int)
+        case paragraph
+        case bullet
+        case numbered(Int)
+        case quote
+        case code(String?)
+        case table(MarkdownBlocks.Table)
+    }
 
-    func blocks(for text: String) -> [MarkdownBlocks.Block] {
-        if let hit = storage[text] { return hit }
-        let blocks = MarkdownBlocks.parse(text)
-        storage[text] = blocks
-        order.append(text)
-        while order.count > 80, let first = order.first {
-            order.removeFirst()
-            storage[first] = nil
+    let id: Int
+    let kind: Kind
+    let text: String
+    let attributed: AttributedString
+    /// Pre-rendered table cells, row-major; empty for other kinds.
+    let cells: [[AttributedString]]
+}
+
+struct RenderedMarkdown {
+    let blocks: [RenderedBlock]
+
+    init(_ text: String) {
+        blocks = MarkdownBlocks.parse(text).map { block in
+            switch block.kind {
+            case .heading(let level):
+                return RenderedBlock(id: block.id, kind: .heading(level), text: block.text, attributed: MarkdownBlocks.inline(block.text), cells: [])
+            case .paragraph:
+                return RenderedBlock(id: block.id, kind: .paragraph, text: block.text, attributed: MarkdownBlocks.inline(block.text), cells: [])
+            case .bullet:
+                return RenderedBlock(id: block.id, kind: .bullet, text: block.text, attributed: MarkdownBlocks.inline(block.text), cells: [])
+            case .numbered(let number):
+                return RenderedBlock(id: block.id, kind: .numbered(number), text: block.text, attributed: MarkdownBlocks.inline(block.text), cells: [])
+            case .quote:
+                return RenderedBlock(id: block.id, kind: .quote, text: block.text, attributed: MarkdownBlocks.inline(block.text), cells: [])
+            case .code(let language):
+                return RenderedBlock(id: block.id, kind: .code(language), text: block.text, attributed: AttributedString(block.text), cells: [])
+            case .table(let table):
+                let cells = ([table.headers] + table.rows).map { row in row.map { MarkdownBlocks.inline($0) } }
+                return RenderedBlock(id: block.id, kind: .table(table), text: "", attributed: AttributedString(), cells: cells)
+            }
         }
-        return blocks
+    }
+}
+
+/// Thread-safe cache of rendered Markdown. Rendering is pure, so history can be warmed off the main thread
+/// and views only read finished AttributedStrings (inline Markdown used to be re-parsed on every redraw).
+final class MarkdownRenderer: @unchecked Sendable {
+    static let shared = MarkdownRenderer()
+
+    private final class Box {
+        let value: RenderedMarkdown
+        init(_ value: RenderedMarkdown) { self.value = value }
+    }
+
+    private let cache = NSCache<NSString, Box>()
+
+    init() {
+        cache.countLimit = 600
+        cache.totalCostLimit = 6_000_000
+    }
+
+    func render(_ text: String) -> RenderedMarkdown {
+        let key = text as NSString
+        if let hit = cache.object(forKey: key) { return hit.value }
+        let value = RenderedMarkdown(text)
+        cache.setObject(Box(value), forKey: key, cost: text.utf16.count)
+        return value
+    }
+
+    /// Renders texts on a background thread so the first scroll through a conversation is smooth.
+    func warm(_ texts: [String]) {
+        let pending = texts.filter { !$0.isEmpty && cache.object(forKey: $0 as NSString) == nil }
+        guard !pending.isEmpty else { return }
+        Task.detached(priority: .utility) { [self] in
+            for text in pending { _ = render(text) }
+        }
     }
 }
 
@@ -229,7 +291,7 @@ final class MarkdownCache {
 
 struct OutputSection: Identifiable {
     enum Kind: Equatable { case command, output, error, json, text }
-    let id = UUID()
+    var id: String { label + ":" + String(text.count) + ":" + String(text.prefix(24)) }
     let kind: Kind
     let label: String
     let text: String

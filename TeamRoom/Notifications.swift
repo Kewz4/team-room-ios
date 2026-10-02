@@ -28,14 +28,22 @@ struct NoticeLedger: Codable {
                   ["completed", "failed", "interrupted", "needs_input"].contains(status.kind) else { continue }
             guard observed[agent.id] != id else { continue }
             observed[agent.id] = id
+            // The relay's continuous work finishes many times an hour; only tasks Kewz sent are news.
+            if status.kind == "completed" && !Self.isKewzRun(status.runId) { continue }
             guard initialized, !notices.contains(where: { $0.id == id }) else { continue }
-            let notice = TeamNotice(id: id, agentId: agent.id, agentLabel: agent.label, kind: status.kind,
+            let notice = TeamNotice(id: id, agentId: agent.id, agentLabel: agent.displayName, kind: status.kind,
                                     title: status.label, detail: status.detail ?? "Open the conversation for details.", time: status.at)
             fresh.append(notice)
         }
         initialized = true
         notices = Array((Array(fresh.reversed()) + notices).prefix(60))
         return fresh
+    }
+
+    /// Messages Kewz sends get UUID ids; relay requests use stable p-/c- ids.
+    static func isKewzRun(_ id: String?) -> Bool {
+        guard let id else { return false }
+        return id.range(of: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-", options: .regularExpression) != nil
     }
 }
 
@@ -173,7 +181,7 @@ final class TeamNotifications: NSObject, UNUserNotificationCenterDelegate {
         guard enabled else { return }
         let content = UNMutableNotificationContent()
         content.title = notice.agentLabel + ": " + notice.title
-        content.body = notice.kind == "test" ? "Team Room can show alerts while connected." : "Open Team Room for the result or request."
+        content.body = notice.kind == "test" ? "Team Room can show alerts while connected." : String(notice.detail.prefix(180))
         content.sound = .default
         content.userInfo = ["agentId": notice.agentId]
         content.threadIdentifier = notice.agentId

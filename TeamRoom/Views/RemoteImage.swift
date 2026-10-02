@@ -47,7 +47,7 @@ struct RemoteImage: View {
         }
         .fullScreenCover(isPresented: $showViewer) {
             if let ui {
-                ImageViewer(image: ui, label: image.label)
+                FullImageLoader(agentId: agentId, image: image, preview: ui)
             }
         }
     }
@@ -70,6 +70,25 @@ struct RemoteImage: View {
                     .controlSize(.small)
             }
         }
+    }
+}
+
+/// Shows the thumbnail at once, then swaps in a sharper copy decoded for full screen.
+struct FullImageLoader: View {
+    @Environment(AppModel.self) private var model
+    let agentId: String
+    let image: EventImage
+    let preview: UIImage
+    @State private var full: UIImage?
+
+    var body: some View {
+        ImageViewer(image: full ?? preview, label: image.label)
+            .task(id: image.id) {
+                #if DEBUG
+                if model.isUITesting { return }
+                #endif
+                full = await model.images.load(agentId: agentId, id: image.id, maxPixel: 2400)
+            }
     }
 }
 

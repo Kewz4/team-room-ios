@@ -2,7 +2,7 @@ name: Build unsigned IPA
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'v*']
   workflow_dispatch:
 
 permissions:
@@ -34,7 +34,7 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
-      - name: Test formatting, task feedback and conversation controls
+      - name: Unit, UI, screenshot and performance tests
         run: |
           set -o pipefail
           DEVICE=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; rows=[v for k in sorted(d,reverse=True) if "iOS-" in k for v in d[k] if v.get("isAvailable") and v["name"].startswith("iPhone")]; print(rows[0]["udid"] if rows else "")')
@@ -54,6 +54,8 @@ jobs:
             xcrun xcresulttool export attachments --path "$RUNNER_TEMP/TeamRoomTests.xcresult" --output-path "$RUNNER_TEMP/qa"
           fi
           cp "$RUNNER_TEMP/test.log" "$RUNNER_TEMP/qa/" 2>/dev/null || true
+          # Performance numbers (clock, memory, scroll hitches, launch) for the QA report.
+          grep -E "measured \[|Test Case .*(passed|failed)" "$RUNNER_TEMP/test.log" > "$RUNNER_TEMP/qa/results-and-metrics.txt" 2>/dev/null || true
           find "$HOME/Library/Logs/DiagnosticReports" -maxdepth 1 -type f -name '*BuildService*' -exec cp {} "$RUNNER_TEMP/qa/" \; 2>/dev/null || true
 
       - name: Upload test evidence

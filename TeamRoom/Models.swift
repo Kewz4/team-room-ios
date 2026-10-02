@@ -141,6 +141,9 @@ struct ChatMessage: Codable, Hashable, Identifiable {
     var editedAt: String?
     var redacted: Bool?
     var images: [EventImage]?
+    /// The bridge cut a very long message; `fullLength` is the original size, loaded on demand.
+    var truncated: Bool?
+    var fullLength: Int?
 }
 
 struct DeliveryHistory: Codable { var messages: [ChatMessage] }
@@ -234,9 +237,39 @@ struct PromptAnswer: Codable {
     var answers: [String: PromptAnswerValue]? = nil
 }
 
+struct AgentHold: Codable, Hashable {
+    var manual: Bool?
+    var until: String?
+    var reason: String?
+}
+
+/// Kewz's hard usage stop for an account (e.g. Polaris stops at 85% of 5 hours / 95% weekly).
+struct AgentQuota: Codable, Hashable {
+    var fiveHourStop: Double?
+    var weeklyStop: Double?
+    var held: Bool?
+    var reason: String?
+    var resumesAt: String?
+}
+
+struct MessagePreview: Codable, Hashable {
+    var role: String?
+    var text: String?
+    var time: String?
+}
+
 struct Agent: Codable, Hashable, Identifiable {
     var id: String
     var label: String
+    /// Worker display name (Nova, Atlas, Scout, Flint, Sage) from bridge API v2; `label` on older bridges.
+    var name: String?
+    var worker: String?
+    var rev: Int?
+    var lastMessage: MessagePreview?
+    var liveLength: Int?
+    var hold: AgentHold?
+    var waiting: Int?
+    var quota: AgentQuota?
     var account: String?
     var role: String?
     var provider: String?
@@ -260,6 +293,8 @@ struct Agent: Codable, Hashable, Identifiable {
     var prompts: [AgentPrompt]?
     var loading: Bool?
     var error: String?
+
+    var displayName: String { (name?.isEmpty == false ? name : nil) ?? label }
 
     var taskStatus: TaskStatus {
         if let prompt = prompts?.first {
@@ -293,6 +328,53 @@ struct Agent: Codable, Hashable, Identifiable {
             }
         }
         return TaskStatus(kind: state == "idle" ? "idle" : "unknown", label: state == "idle" ? "Ready" : "Checking activity", detail: "Refresh to see the latest task result.")
+    }
+}
+
+extension Agent {
+    private enum DecodeKeys: String, CodingKey {
+        case id, label, name, worker, rev, lastMessage, liveLength, hold, waiting, quota, account, role, provider, modelLabel, effort,
+             sessionId, state, statusSummary, execution, activity, connection, usage, lastEventAt, source, canStop, liveText,
+             turnId, queue, messages, events, prompts, loading, error
+    }
+
+    /// Field-by-field decoding: a malformed optional field is dropped instead of hiding the whole teammate.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: DecodeKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        let name = try? c.decodeIfPresent(String.self, forKey: .name)
+        label = (try? c.decodeIfPresent(String.self, forKey: .label)) ?? name ?? id
+        self.name = name
+        worker = try? c.decodeIfPresent(String.self, forKey: .worker)
+        rev = try? c.decodeIfPresent(Int.self, forKey: .rev)
+        lastMessage = try? c.decodeIfPresent(MessagePreview.self, forKey: .lastMessage)
+        liveLength = try? c.decodeIfPresent(Int.self, forKey: .liveLength)
+        hold = try? c.decodeIfPresent(AgentHold.self, forKey: .hold)
+        waiting = try? c.decodeIfPresent(Int.self, forKey: .waiting)
+        quota = try? c.decodeIfPresent(AgentQuota.self, forKey: .quota)
+        account = try? c.decodeIfPresent(String.self, forKey: .account)
+        role = try? c.decodeIfPresent(String.self, forKey: .role)
+        provider = try? c.decodeIfPresent(String.self, forKey: .provider)
+        modelLabel = try? c.decodeIfPresent(String.self, forKey: .modelLabel)
+        effort = try? c.decodeIfPresent(String.self, forKey: .effort)
+        sessionId = try? c.decodeIfPresent(String.self, forKey: .sessionId)
+        state = try? c.decodeIfPresent(String.self, forKey: .state)
+        statusSummary = try? c.decodeIfPresent(TaskStatus.self, forKey: .statusSummary)
+        execution = try? c.decodeIfPresent(Execution.self, forKey: .execution)
+        activity = try? c.decodeIfPresent(String.self, forKey: .activity)
+        connection = try? c.decodeIfPresent(AgentConnection.self, forKey: .connection)
+        usage = try? c.decodeIfPresent(AgentUsage.self, forKey: .usage)
+        lastEventAt = try? c.decodeIfPresent(String.self, forKey: .lastEventAt)
+        source = try? c.decodeIfPresent(String.self, forKey: .source)
+        canStop = try? c.decodeIfPresent(Bool.self, forKey: .canStop)
+        liveText = try? c.decodeIfPresent(String.self, forKey: .liveText)
+        turnId = try? c.decodeIfPresent(String.self, forKey: .turnId)
+        queue = c.contains(.queue) ? c.lossy(ChatMessage.self, forKey: .queue) : nil
+        messages = c.contains(.messages) ? c.lossy(ChatMessage.self, forKey: .messages) : nil
+        events = c.contains(.events) ? c.lossy(LiveEvent.self, forKey: .events) : nil
+        prompts = c.contains(.prompts) ? c.lossy(AgentPrompt.self, forKey: .prompts) : nil
+        loading = try? c.decodeIfPresent(Bool.self, forKey: .loading)
+        error = try? c.decodeIfPresent(String.self, forKey: .error)
     }
 }
 

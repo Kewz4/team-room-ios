@@ -75,37 +75,42 @@ final class ResponseDecodingTests: XCTestCase {
         XCTAssertTrue(usage["updatedAt"] is String)
     }
 
-    func testUnsupportedTimestampShapesIdentifyFieldWithoutEchoingSecrets() throws {
+    // 1.0: a malformed optional field drops only that field; the teammate stays visible (it used to blank the app).
+    func testUnsupportedTimestampShapesDropOnlyTheUsageField() throws {
         for value in [true, ["cookie": "BODY_SECRET"], ["BODY_SECRET"]] as [Any] {
-            XCTAssertThrowsError(try ResponseDecoder.decode(StateResponse.self,
-                from: fixture([value]), endpoint: endpoint)) { error in
-                XCTAssertEqual((error as? ClientError)?.message,
-                    "Unexpected response from /api/state at agents[0].usage.updatedAt.")
-                XCTAssertFalse(error.localizedDescription.contains("SECRET"))
-                XCTAssertFalse(error.localizedDescription.contains("private.example"))
-            }
+            let state = try ResponseDecoder.decode(StateResponse.self, from: fixture([value]), endpoint: endpoint)
+            XCTAssertEqual(state.agents.map(\.id), ["flint"])
+            XCTAssertNil(state.agents[0].usage)
+            XCTAssertEqual(state.agents[0].taskStatus.kind, "completed")
         }
     }
 
-    func testOutOfRangeNumericTimestampFailsAtTimestampField() throws {
+    func testUsageDecoderStillNamesTheFieldWithoutEchoingSecrets() throws {
+        struct Wrapper: Decodable { var usage: AgentUsage }
+        let data = Data(#"{"usage":{"updatedAt":{"cookie":"BODY_SECRET"}}}"#.utf8)
+        XCTAssertThrowsError(try ResponseDecoder.decode(Wrapper.self, from: data, endpoint: endpoint)) { error in
+            XCTAssertEqual((error as? ClientError)?.message, "Unexpected response from /api/state at usage.updatedAt.")
+            XCTAssertFalse(error.localizedDescription.contains("SECRET"))
+            XCTAssertFalse(error.localizedDescription.contains("private.example"))
+        }
+    }
+
+    func testOutOfRangeNumericTimestampDropsUsageOnly() throws {
         for value in [1e308, -1e308] {
-            XCTAssertThrowsError(try ResponseDecoder.decode(StateResponse.self,
-                from: fixture([value]), endpoint: endpoint)) { error in
-                XCTAssertEqual((error as? ClientError)?.message,
-                    "Unexpected response from /api/state at agents[0].usage.updatedAt.")
-            }
+            let state = try ResponseDecoder.decode(StateResponse.self, from: fixture([value]), endpoint: endpoint)
+            XCTAssertNil(state.agents[0].usage)
+            XCTAssertEqual(state.agents[0].id, "flint")
         }
     }
 
-    func testOtherRequiredContractFailuresAreStillRejectedWithField() throws {
-        let data = Data(#"{"agents":[{"id":"flint","label":true,"liveText":"BODY_SECRET"}]}"#.utf8)
-        XCTAssertThrowsError(try ResponseDecoder.decode(StateResponse.self, from: data, endpoint: endpoint)) { error in
-            XCTAssertEqual((error as? ClientError)?.message, "Unexpected response from /api/state at agents[0].label.")
-        }
+    func testMissingIdIsStillRejectedWithFieldAndLabelFallsBack() throws {
         XCTAssertThrowsError(try ResponseDecoder.decode(StateResponse.self,
-            from: Data(#"{"agents":[{"id":"flint"}]}"#.utf8), endpoint: endpoint)) { error in
-            XCTAssertEqual((error as? ClientError)?.message, "Unexpected response from /api/state at agents[0].label.")
+            from: Data(#"{"agents":[{"label":"Flint","liveText":"BODY_SECRET"}]}"#.utf8), endpoint: endpoint)) { error in
+            XCTAssertEqual((error as? ClientError)?.message, "Unexpected response from /api/state at agents[0].id.")
+            XCTAssertFalse(error.localizedDescription.contains("BODY_SECRET"))
         }
+        let state = try ResponseDecoder.decode(StateResponse.self, from: Data(#"{"agents":[{"id":"flint","label":true}]}"#.utf8), endpoint: endpoint)
+        XCTAssertEqual(state.agents[0].label, "flint")
     }
 
     func testMalformedJSONGivesEndpointWithoutResponseBody() {
@@ -155,11 +160,10 @@ final class ResponseDecodingTests: XCTestCase {
         XCTAssertEqual(state.agents[0].usage?.weekly, 80)
     }
 
-    func testMalformedBalanceIsRejectedAtItsFieldPathWithoutEchoingTheBody() throws {
+    func testMalformedBalanceDropsUsageButKeepsTheTeammate() throws {
         let data = Data(#"{"agents":[{"id":"flint","label":"Flint","usage":{"balance":"BODY_SECRET"}}]}"#.utf8)
-        XCTAssertThrowsError(try ResponseDecoder.decode(StateResponse.self, from: data, endpoint: endpoint)) { error in
-            XCTAssertEqual((error as? ClientError)?.message, "Unexpected response from /api/state at agents[0].usage.balance.")
-            XCTAssertFalse(error.localizedDescription.contains("BODY_SECRET"))
-        }
+        let state = try ResponseDecoder.decode(StateResponse.self, from: data, endpoint: endpoint)
+        XCTAssertEqual(state.agents[0].label, "Flint")
+        XCTAssertNil(state.agents[0].usage)
     }
 }

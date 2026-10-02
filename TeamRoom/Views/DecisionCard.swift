@@ -259,7 +259,7 @@ struct DecisionCard: View {
     private func respond(_ answer: PromptAnswer) {
         busy = true
         Task { @MainActor in
-            await model.respond(to: prompt, answer: answer)
+            await model.respond(agentId: agentId, to: prompt, answer: answer)
             busy = false
         }
     }
