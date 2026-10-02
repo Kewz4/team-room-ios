@@ -53,13 +53,20 @@ final class TeamRoomUITests: XCTestCase {
         capture("04-agents", app)
         nova.tap()
         let picture = app.buttons["Fixture artwork"]
-        XCTAssertTrue(picture.waitForExistence(timeout: 10))
+        if !picture.waitForExistence(timeout: 20) {
+            capture("05-agent-room-missing-artwork", app)
+            XCTFail("the room should open at its newest messages, which include the fixture artwork")
+            return
+        }
         XCTAssertTrue(app.descendants(matching: .any)["markdown-table"].exists)
         assertNoJumpButton(app, "a room opens at its newest message")
         capture("05-agent-room", app)
-        let scroll = app.scrollViews["conversation-scroll"]
-        scroll.swipeDown(velocity: .fast)
-        scroll.swipeDown(velocity: .fast)
+        // Drag in the messages above the pinned decision card: a swipe at the screen centre lands on the card and
+        // scrolls nothing (1.0 review: the old swipe only "passed" because the button showed all the time).
+        for _ in 0..<4 {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.24))
+                .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.39)))
+        }
         let latest = app.buttons["jump-latest"]
         XCTAssertTrue(latest.waitForExistence(timeout: 5))
         latest.tap()
