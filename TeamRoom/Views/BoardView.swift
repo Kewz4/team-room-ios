@@ -296,7 +296,8 @@ struct OverviewCard: View {
                         .foregroundStyle(Tokens.textSecondary)
                         .lineLimit(4)
                 }
-                HStack(spacing: 6) {
+                // 1.1: pills keep their width and wrap as whole capsules (FlowRow) instead of squeezing.
+                FlowRow(spacing: 6) {
                     let done = report.milestones.filter { $0.status == "done" }.count
                     Pill(text: "\(done)/\(report.milestones.count) milestones", color: Tokens.accent, systemImage: "flag")
                     let blocked = report.milestones.filter { $0.status == "blocked" }.count
@@ -340,7 +341,7 @@ struct LaneRow: View {
                     .foregroundStyle(lane.state == "working" ? Tokens.working : Tokens.textSecondary)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
-                HStack(spacing: 6) {
+                FlowRow(spacing: 6) {
                     if let queued = lane.queued, queued > 0 { Pill(text: "\(queued) queued", color: Tokens.info) }
                     if let blocked = lane.blocked, blocked > 0 { Pill(text: "\(blocked) blocked", color: Tokens.failure) }
                     if lane.hold != nil { Pill(text: "hold", color: Tokens.textSecondary, systemImage: "pause.circle") }

@@ -101,27 +101,17 @@ struct AgentRow: View {
                         .foregroundStyle(Tokens.textSecondary)
                         .lineLimit(2)
                 }
-                HStack(spacing: 6) {
-                    if agent.quota?.held == true {
-                        Pill(text: "Usage pause", color: Tokens.working, systemImage: "gauge.with.dots.needle.67percent")
-                            .accessibilityLabel(agent.quota?.reason ?? "Paused for usage")
+                // 1.1: pills keep their natural width. With room they sit beside the usage bars; otherwise whole pills
+                // wrap to a new line and the bars move under them (1.0 squeezed them one letter per line).
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .center, spacing: 6) {
+                        pills
+                        Spacer(minLength: 0)
+                        usage
                     }
-                    if let hold = agent.hold {
-                        Pill(text: hold.until != nil ? "On hold" : "Reserve", color: Tokens.textSecondary, systemImage: "pause.circle")
-                            .accessibilityLabel("Hold: \(hold.reason ?? "")")
-                    }
-                    if let waiting = agent.waiting, waiting > 0 {
-                        Pill(text: "\(waiting) queued", color: Tokens.info, systemImage: "tray.full")
-                    }
-                    let failures = (agent.queue ?? []).filter { ["failed", "interrupted"].contains($0.state ?? "") }.count
-                    if failures > 0 {
-                        Pill(text: "\(failures) failed", color: Tokens.failure, systemImage: "exclamationmark.triangle")
-                    }
-                    Spacer(minLength: 0)
-                    if let balance = agent.usage?.balance {
-                        BalanceChip(balance: balance)
-                    } else if agent.usage?.fiveHour != nil || agent.usage?.weekly != nil {
-                        UsageBars(usage: agent.usage)
+                    VStack(alignment: .leading, spacing: 6) {
+                        FlowRow(spacing: 6) { pills }
+                        usage.frame(maxWidth: .infinity, alignment: .trailing)
                     }
                 }
                 .padding(.top, 2)
@@ -129,6 +119,36 @@ struct AgentRow: View {
         }
         .padding(.vertical, 4)
         .accessibilityElement(children: .combine)
+    }
+
+    @ViewBuilder private var pills: some View {
+        if agent.quota?.held == true {
+            Pill(text: "Usage pause", color: Tokens.working, systemImage: "gauge.with.dots.needle.67percent")
+                .accessibilityLabel(agent.quota?.reason ?? "Paused for usage")
+        } else if agent.limit?.level == "near" {
+            // Close to a usage limit: the room holds turns that would fail, so plan around it before it bites.
+            Pill(text: "Near limit", color: Tokens.working, systemImage: "gauge.with.dots.needle.33percent")
+                .accessibilityLabel(agent.limit?.reason ?? "Close to a usage limit")
+        }
+        if let hold = agent.hold {
+            Pill(text: hold.until != nil ? "On hold" : "Reserve", color: Tokens.textSecondary, systemImage: "pause.circle")
+                .accessibilityLabel("Hold: \(hold.reason ?? "")")
+        }
+        if let waiting = agent.waiting, waiting > 0 {
+            Pill(text: "\(waiting) queued", color: Tokens.info, systemImage: "tray.full")
+        }
+        let failures = (agent.queue ?? []).filter { ["failed", "interrupted"].contains($0.state ?? "") }.count
+        if failures > 0 {
+            Pill(text: "\(failures) failed", color: Tokens.failure, systemImage: "exclamationmark.triangle")
+        }
+    }
+
+    @ViewBuilder private var usage: some View {
+        if let balance = agent.usage?.balance {
+            BalanceChip(balance: balance)
+        } else if UsageBars.shows(agent.usage) {
+            UsageBars(usage: agent.usage)
+        }
     }
 
     private var statusLine: String {

@@ -68,10 +68,35 @@ struct AgentUsage: Codable, Hashable {
     var source: String?
     var resetAt: String?
     var balance: AgentBalance?
+    /// 1.1: when the 5-hour window resets, and the monthly window OpenCode Go reports (Flint), with its reset.
+    var fiveHourResetAt: String? = nil
+    var monthly: Double? = nil
+    var monthlyResetAt: String? = nil
+    /// Why usage is missing or stale (e.g. the OpenCode Go key was refused).
+    var reason: String? = nil
 
     private enum CodingKeys: String, CodingKey {
-        case activity, weekly, fiveHour, updatedAt, source, resetAt, balance
+        case activity, weekly, fiveHour, updatedAt, source, resetAt, balance, fiveHourResetAt, monthly, monthlyResetAt, reason
     }
+}
+
+/// Usage-limit picture from the bridge (1.1): how close a teammate is to its stop or the provider limit, and whether
+/// the room is holding its turns. Levels: ok, near, stop (Kewz's own stop), limit (provider limit reached).
+struct AgentLimit: Codable, Hashable {
+    var level: String?
+    var window: String?
+    var key: String?
+    var used: Double?
+    var stop: Double?
+    var resetAt: String?
+    var resumesAt: String?
+    var projected: Double?
+    var turnCost: Double?
+    var held: Bool?
+    var holdUntil: String?
+    var reason: String?
+
+    var isNear: Bool { level == "near" && held != true }
 }
 
 extension AgentUsage {
@@ -83,6 +108,10 @@ extension AgentUsage {
         source = try values.decodeIfPresent(String.self, forKey: .source)
         resetAt = try values.decodeIfPresent(String.self, forKey: .resetAt)
         balance = try values.decodeIfPresent(AgentBalance.self, forKey: .balance)
+        fiveHourResetAt = try? values.decodeIfPresent(String.self, forKey: .fiveHourResetAt)
+        monthly = try? values.decodeIfPresent(Double.self, forKey: .monthly)
+        monthlyResetAt = try? values.decodeIfPresent(String.self, forKey: .monthlyResetAt)
+        reason = try? values.decodeIfPresent(String.self, forKey: .reason)
         if !values.contains(.updatedAt) {
             updatedAt = nil
         } else if try values.decodeNil(forKey: .updatedAt) {
@@ -293,8 +322,13 @@ struct Agent: Codable, Hashable, Identifiable {
     var prompts: [AgentPrompt]?
     var loading: Bool?
     var error: String?
+    /// 1.1: usage-limit picture and whether a message can go into the running turn (steering) right now.
+    var limit: AgentLimit? = nil
+    var canSteer: Bool? = nil
 
     var displayName: String { (name?.isEmpty == false ? name : nil) ?? label }
+    /// Steering is possible while a turn the Team Room started is running (older bridges: a stoppable turn).
+    var steerable: Bool { state == "working" && (canSteer ?? canStop) == true }
 
     var taskStatus: TaskStatus {
         if let prompt = prompts?.first {
@@ -335,7 +369,7 @@ extension Agent {
     private enum DecodeKeys: String, CodingKey {
         case id, label, name, worker, rev, lastMessage, liveLength, hold, waiting, quota, account, role, provider, modelLabel, effort,
              sessionId, state, statusSummary, execution, activity, connection, usage, lastEventAt, source, canStop, liveText,
-             turnId, queue, messages, events, prompts, loading, error
+             turnId, queue, messages, events, prompts, loading, error, limit, canSteer
     }
 
     /// Field-by-field decoding: a malformed optional field is dropped instead of hiding the whole teammate.
@@ -375,6 +409,8 @@ extension Agent {
         prompts = c.contains(.prompts) ? c.lossy(AgentPrompt.self, forKey: .prompts) : nil
         loading = try? c.decodeIfPresent(Bool.self, forKey: .loading)
         error = try? c.decodeIfPresent(String.self, forKey: .error)
+        limit = try? c.decodeIfPresent(AgentLimit.self, forKey: .limit)
+        canSteer = try? c.decodeIfPresent(Bool.self, forKey: .canSteer)
     }
 }
 

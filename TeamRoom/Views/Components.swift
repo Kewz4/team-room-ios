@@ -49,16 +49,63 @@ struct Pill: View {
     var body: some View {
         HStack(spacing: 4) {
             if let systemImage { Image(systemName: systemImage).font(.caption2.weight(.semibold)) }
-            Text(text).font(.caption2.weight(.semibold))
+            Text(text).font(.caption2.weight(.semibold)).lineLimit(1)
         }
         .foregroundStyle(color)
         .padding(.horizontal, 8)
         .padding(.vertical, 3)
         .background(color.opacity(0.12), in: Capsule())
+        // A pill keeps its natural width (1.1: squeezed rows wrapped "2 failed" one letter per line); rows that run
+        // out of space wrap whole pills instead (FlowRow).
+        .fixedSize()
     }
 }
 
-/// Compact 5-hour + weekly usage bars, colour-coded by pressure.
+/// Lays its views out left to right and starts a new line when the next one does not fit (pills on agent cards).
+struct FlowRow: Layout {
+    var spacing: CGFloat = 6
+    var lineSpacing: CGFloat = 6
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let lines = arrange(subviews, width: proposal.width ?? .infinity)
+        let width = lines.map(\.width).max() ?? 0
+        let height = lines.map(\.height).reduce(0, +) + lineSpacing * CGFloat(max(lines.count - 1, 0))
+        return CGSize(width: width, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var y = bounds.minY
+        for line in arrange(subviews, width: bounds.width) {
+            var x = bounds.minX
+            for index in line.indices {
+                let size = subviews[index].sizeThatFits(.unspecified)
+                subviews[index].place(at: CGPoint(x: x, y: y + (line.height - size.height) / 2), proposal: ProposedViewSize(size))
+                x += size.width + spacing
+            }
+            y += line.height + lineSpacing
+        }
+    }
+
+    private struct Line { var indices: [Int] = []; var width: CGFloat = 0; var height: CGFloat = 0 }
+
+    private func arrange(_ subviews: Subviews, width: CGFloat) -> [Line] {
+        var lines = [Line()]
+        for index in subviews.indices {
+            let size = subviews[index].sizeThatFits(.unspecified)
+            if !lines[lines.count - 1].indices.isEmpty && lines[lines.count - 1].width + spacing + size.width > width {
+                lines.append(Line())
+            }
+            var line = lines[lines.count - 1]
+            line.width += (line.indices.isEmpty ? 0 : spacing) + size.width
+            line.height = max(line.height, size.height)
+            line.indices.append(index)
+            lines[lines.count - 1] = line
+        }
+        return lines.filter { !$0.indices.isEmpty }
+    }
+}
+
+/// Compact 5-hour, weekly and (OpenCode Go) monthly usage bars, colour-coded by pressure.
 struct UsageBars: View {
     let usage: AgentUsage?
     // Scales with Dynamic Type (the 1.0 large-text screenshot showed fixed 10 pt labels).
@@ -71,15 +118,22 @@ struct UsageBars: View {
         VStack(alignment: .trailing, spacing: 3) {
             if let fiveHour = usage?.fiveHour { bar(label: "5h", value: fiveHour) }
             if let weekly = usage?.weekly { bar(label: "wk", value: weekly) }
+            if let monthly = usage?.monthly { bar(label: "mo", value: monthly) }
         }
+        .fixedSize()
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
+    }
+
+    static func shows(_ usage: AgentUsage?) -> Bool {
+        usage?.fiveHour != nil || usage?.weekly != nil || usage?.monthly != nil
     }
 
     private var accessibilityText: String {
         var parts: [String] = []
         if let fiveHour = usage?.fiveHour { parts.append("5-hour usage \(Int(fiveHour)) percent") }
         if let weekly = usage?.weekly { parts.append("weekly usage \(Int(weekly)) percent") }
+        if let monthly = usage?.monthly { parts.append("monthly usage \(Int(monthly)) percent") }
         return parts.joined(separator: ", ")
     }
 

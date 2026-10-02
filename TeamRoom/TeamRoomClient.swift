@@ -204,6 +204,12 @@ actor TeamRoomClient {
         _ = try await data(for: post(try endpoint("/api/cancel-message"), Body(id: id)))
     }
 
+    /// 1.1: push a queued message into the turn that is running now (steering).
+    func steer(id: String) async throws {
+        struct Body: Codable { var id: String }
+        _ = try await data(for: post(try endpoint("/api/steer"), Body(id: id)))
+    }
+
     func retry(id: String) async throws {
         struct Body: Codable { var id: String }
         _ = try await data(for: post(try endpoint("/api/retry"), Body(id: id)))

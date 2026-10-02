@@ -77,6 +77,27 @@ final class TeamRoomTests: XCTestCase {
         XCTAssertNil(StreamDelta.apply(try frame(#"{"type":"stream","agentId":"a","base":3,"append":"x"}"#), to: text))
     }
 
+    /// 1.1: limit awareness, OpenCode Go's monthly window and steering decode from /api/team summaries.
+    func testLimitMonthlyAndSteeringFieldsDecode() throws {
+        let json = #"{"id":"opencode-world","label":"Flint","state":"working","canStop":true,"canSteer":true,"usage":{"fiveHour":12,"fiveHourResetAt":"2026-10-02T19:47:04.617Z","weekly":40,"resetAt":"2026-10-05T00:00:00.000Z","monthly":91,"monthlyResetAt":"2026-11-02T14:20:11.000Z","source":"Native OpenCode Go usage"},"limit":{"level":"near","window":"monthly","key":"monthly","used":91,"stop":100,"held":false,"reason":"Flint is close to the monthly limit (91% of the monthly limit used)."}}"#
+        let agent = try JSONDecoder().decode(Agent.self, from: Data(json.utf8))
+        XCTAssertEqual(agent.usage?.monthly, 91)
+        XCTAssertEqual(agent.usage?.fiveHourResetAt, "2026-10-02T19:47:04.617Z")
+        XCTAssertEqual(agent.limit?.level, "near")
+        XCTAssertTrue(agent.limit?.isNear == true)
+        XCTAssertTrue(agent.steerable)
+        XCTAssertTrue(UsageBars.shows(agent.usage))
+        // An idle teammate, or one whose turn the Team Room did not start, is not steerable.
+        var idle = agent; idle.state = "idle"
+        XCTAssertFalse(idle.steerable)
+        var desktop = agent; desktop.canSteer = false
+        XCTAssertFalse(desktop.steerable)
+        // A malformed limit is dropped without hiding the teammate.
+        let broken = try JSONDecoder().decode(Agent.self, from: Data(#"{"id":"x","label":"X","limit":"oops","usage":{"monthly":"bad"}}"#.utf8))
+        XCTAssertNil(broken.limit)
+        XCTAssertNil(broken.usage?.monthly)
+    }
+
     func testLiveFramesDecodeTeamRoomAndActivityShapesLossily() throws {
         let team = try JSONDecoder().decode(LiveFrame.self, from: Data(#"{"type":"team","revision":9,"agents":[{"id":"gpt-assets","label":"GPT Plus","name":"Scout","rev":4,"waiting":2},{"label":"broken"}]}"#.utf8))
         XCTAssertEqual(team.agents?.map(\.id), ["gpt-assets"])

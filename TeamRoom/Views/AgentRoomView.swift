@@ -135,6 +135,26 @@ struct AgentComposer: View {
     @FocusState private var focused: Bool
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if steerable {
+                // 1.1 steering: while a Team Room turn runs, a message goes into that turn instead of waiting behind it.
+                Label("Goes into \(name)'s current turn · hold send to queue instead", systemImage: "arrow.turn.down.right")
+                    .font(TypeScale.caption)
+                    .foregroundStyle(Tokens.textTertiary)
+                    .lineLimit(1)
+                    .padding(.horizontal, Tokens.Space.s)
+                    .accessibilityIdentifier("steer-hint")
+            }
+            composerRow
+        }
+        .padding(.horizontal, Tokens.Space.m)
+        .padding(.vertical, Tokens.Space.s)
+    }
+
+    private var steerable: Bool { model.team.agent(agentId)?.steerable == true }
+    private var name: String { model.team.agent(agentId)?.displayName ?? "the teammate" }
+
+    private var composerRow: some View {
         HStack(alignment: .bottom, spacing: Tokens.Space.s) {
             TextField(placeholder, text: draft, axis: .vertical)
                 .font(TypeScale.body)
@@ -152,7 +172,7 @@ struct AgentComposer: View {
                     if model.sendingTo.contains(agentId) {
                         ProgressView().tint(.white)
                     } else {
-                        Image(systemName: "arrow.up").font(.system(size: 16, weight: .semibold))
+                        Image(systemName: steerable ? "arrow.turn.down.right" : "arrow.up").font(.system(size: 16, weight: .semibold))
                     }
                 }
                 .frame(width: 42, height: 42)
@@ -162,11 +182,22 @@ struct AgentComposer: View {
             .clipShape(Circle())
             .disabled(!canSend)
             .opacity(canSend ? 1 : 0.5)
-            .accessibilityLabel("Send message")
+            .contextMenu {
+                if steerable {
+                    Button("Queue after this turn", systemImage: "tray.and.arrow.down") {
+                        let text = draft.wrappedValue
+                        Task { await model.send(text, to: agentId, mode: "queue") }
+                    }
+                    Button("Steer into this turn", systemImage: "arrow.turn.down.right") {
+                        let text = draft.wrappedValue
+                        Task { await model.send(text, to: agentId, mode: "steer") }
+                    }
+                }
+            }
+            .accessibilityLabel(steerable ? "Steer message into the current turn" : "Send message")
+            .accessibilityIdentifier("send-button")
             .sensoryFeedback(.impact(weight: .light), trigger: model.sendingTo.contains(agentId)) { old, new in !old && new }
         }
-        .padding(.horizontal, Tokens.Space.m)
-        .padding(.vertical, Tokens.Space.s)
     }
 
     private var draft: Binding<String> {
@@ -411,10 +442,18 @@ struct QueueSection: View {
                                 Label(label(item), systemImage: "clock")
                                     .font(TypeScale.caption)
                                     .foregroundStyle(Tokens.textTertiary)
+                                    .lineLimit(2)
+                                if ["queued", "waiting_busy"].contains(item.state ?? ""), model.team.agent(agentId)?.steerable == true {
+                                    Button("Steer now") { Task { await model.steerQueued(id: item.id, agentId: agentId) } }
+                                        .font(TypeScale.captionMedium)
+                                        .foregroundStyle(Tokens.accent)
+                                        .fixedSize()
+                                }
                                 if ["queued", "waiting_busy", "waiting_connection"].contains(item.state ?? "") {
                                     Button("Cancel") { Task { await model.cancelQueued(id: item.id, agentId: agentId) } }
                                         .font(TypeScale.captionMedium)
                                         .foregroundStyle(Tokens.textSecondary)
+                                        .fixedSize()
                                 }
                             }
                         }
@@ -428,7 +467,8 @@ struct QueueSection: View {
     private func label(_ item: ChatMessage) -> String {
         switch item.state {
         case "queued": return "Queued"
-        case "waiting_busy": return "Waiting for the current turn"
+        case "steered": return "Steered into the current turn"
+        case "waiting_busy": return item.error?.isEmpty == false ? item.error! : "Waiting for the current turn"
         case "waiting_connection": return "Waiting for the runner"
         case "sending": return "Sending…"
         default: return item.state ?? "Pending"

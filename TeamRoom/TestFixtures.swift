@@ -63,37 +63,53 @@ enum TestFixtures {
     static var agents: [Agent] {
         func agent(_ id: String, _ name: String, _ account: String, _ model: String, _ provider: String, role: String, state: String,
                    doing: String? = nil, last: String, lastRole: String = "assistant", five: Double? = nil, week: Double? = nil,
-                   waiting: Int = 0, hold: AgentHold? = nil, prompts: [AgentPrompt]? = nil, summary: TaskStatus? = nil) -> Agent {
+                   waiting: Int = 0, hold: AgentHold? = nil, failed: Int = 0, month: Double? = nil, limit: AgentLimit? = nil,
+                   steering: Bool = false, prompts: [AgentPrompt]? = nil, summary: TaskStatus? = nil) -> Agent {
             var value = Agent(id: id, label: name, name: name, worker: name.lowercased(), rev: 3,
                               lastMessage: MessagePreview(role: lastRole, text: last, time: "2026-10-02T03:20:00Z"), liveLength: 0, hold: hold, waiting: waiting,
                               account: account, role: role, provider: provider, modelLabel: model, state: state, statusSummary: summary,
                               execution: doing.map { Execution(phase: "tool", label: $0, since: "2026-10-02T03:15:00Z") }, connection: AgentConnection(ready: true),
-                              usage: AgentUsage(activity: nil, weekly: week, fiveHour: five, updatedAt: now, source: "Native usage", resetAt: nil, balance: nil),
-                              lastEventAt: "2026-10-02T03:25:00Z", canStop: false, queue: [], prompts: prompts)
-            if id == "opencode-world" {
-                value.usage = AgentUsage(activity: nil, weekly: nil, fiveHour: nil, updatedAt: now, source: "DeepSeek balance", resetAt: nil,
-                                         balance: AgentBalance(available: true, currency: "CNY", total: "3.47", granted: "3.47", toppedUp: "0.00", source: "DeepSeek /user/balance", updatedAt: now, reason: nil))
+                              usage: AgentUsage(activity: nil, weekly: week, fiveHour: five, updatedAt: now, source: "Native usage", resetAt: nil, balance: nil, monthly: month),
+                              lastEventAt: "2026-10-02T03:25:00Z", canStop: steering, queue: [], prompts: prompts)
+            // 1.1 stress case from Kewz's phone (2026-10-02 08:32): hold + queued + failed + usage bars on one card.
+            value.queue = (0..<failed).map {
+                ChatMessage(id: "\(id)-failed-\($0)", text: "Relay request \($0 + 1)", agentId: id, createdAt: now, state: "failed",
+                            error: "You've hit your session limit · resets 6:10am (America/El_Salvador)")
+            }
+            value.limit = limit
+            value.canSteer = steering
+            if limit?.held == true {
+                value.quota = AgentQuota(fiveHourStop: nil, weeklyStop: nil, held: true, reason: limit?.reason, resumesAt: limit?.resumesAt)
             }
             return value
         }
+        let novaLimit = AgentLimit(level: "limit", window: "weekly", key: "weekly", used: 97, stop: 100, resetAt: "2026-10-06T20:00:00Z",
+                                   resumesAt: "2026-10-06T20:02:00Z", held: true,
+                                   reason: "Nova is at the weekly usage limit (97% used). New turns wait until Tue 2:02 PM CST.")
+        let scoutLimit = AgentLimit(level: "near", window: "5-hour", key: "fiveHour", used: 95, stop: 100, resetAt: "2026-10-02T16:35:46Z",
+                                    held: false, reason: "Scout is close to the 5-hour limit (95% of the 5-hour limit used).")
         let finished = TaskStatus(kind: "completed", label: "Finished", detail: "Reviewed the relay proposal; 2 findings sent to Nova.", at: "2026-10-02T03:05:00Z", eventId: "f1")
         return [
             agent("claude-polaris", "Polaris", "Max 5× · new", "Opus 5.5 · Max", "claude", role: "Lead coordinator", state: "working",
-                  doing: "Triaging Nova's queue (72 waiting) into today's priorities", last: "Reordered the queue: radar verdict first, then Johto author answers.", five: 12, week: 3),
+                  doing: "Triaging Nova's queue (72 waiting) into today's priorities", last: "Reordered the queue: radar verdict first, then Johto author answers.", five: 12, week: 3,
+                  steering: true),
             agent("claude-assets", "Nova", "Pro 1×", "Sonnet 5.5 · Max", "claude", role: "Creative lead · backup coordinator", state: "idle",
-                  last: "Zekrom v2 proof is ready for your verdict.", five: 65, week: 63, waiting: 72,
+                  last: "Zekrom v2 proof is ready for your verdict.", week: 97, waiting: 1,
+                  hold: AgentHold(manual: false, until: "2026-10-06T20:02:00Z", reason: "Wake-up after the weekly reset."), failed: 2, limit: novaLimit,
                   prompts: [AgentPrompt(id: "p1", kind: "question", title: "Approve the Zekrom v2 radar before the batch?", detail: nil, command: nil, cwd: nil, reason: nil, createdAt: "2026-10-02T03:10:00Z", allowSession: nil,
                                         questions: [PromptQuestion(id: "q0", header: "Radar art", question: "Use the storm-glass Zekrom style for all 27 legendary radars?", isOther: true, isSecret: false,
                                                                    options: [PromptOption(label: "Approve", description: "Rework the other 26 in this style"), PromptOption(label: "Revise", description: "Change the style first")])])]),
             agent("gpt-world", "Atlas", "GPT 5×", "Astra · Ultra", "codex", role: "Quest engine lead", state: "idle",
                   last: "N8: 70 tests pass, all 21 malformed saves rejected; game run pending.", five: 20, week: 89,
                   hold: AgentHold(manual: true, until: nil, reason: "Shared reserve until the October 6 reset."), summary: finished),
-            agent("gpt-assets", "Scout", "Plus 1×", "Sol 6.1 · High", "codex", role: "QA and verification", state: "working",
-                  doing: "Reviewing Sage's SP-9 crash-test plan v2", last: "S020 gate findings sent to Sage and Nova.", lastRole: "assistant", five: 61, week: 52, waiting: 2),
-            agent("opencode-world", "Flint", "DeepSeek Harness", "DeepSeek Flash · Max", "dsh", role: "Terrain & world generation", state: "idle",
-                  last: "FIX2-ANNEX2 Tier A packet published.", waiting: 5, hold: AgentHold(manual: true, until: nil, reason: "Out until Friday.")),
+            agent("gpt-assets", "Scout", "Plus 1×", "Sol 6.1 · High", "codex", role: "QA and verification", state: "idle",
+                  last: "Review complete. R3L-F1/F2 close in static/Python-fixture scope.", lastRole: "assistant", five: 95, week: 87, waiting: 2,
+                  hold: AgentHold(manual: false, until: "2026-10-02T16:37:46Z", reason: "Wake-up 2 minutes after the 5-hour reset."), limit: scoutLimit),
+            agent("opencode-world", "Flint", "DeepSeek Harness · OpenCode Go", "DeepSeek V4.1 Flash · Max", "dsh", role: "Terrain & world generation", state: "idle",
+                  last: "FIX2-ANNEX2 Tier A packet published.", five: 4, week: 1, waiting: 5, month: 18),
             agent("claude-adventure", "Sage", "Max 5×", "Opus 5.5 · Max", "claude", role: "Principal reviewer", state: "working",
-                  doing: "Building the dedicated-server profile for SP-9", last: "SP-9 plan revised for all five of Scout's findings.", week: 41, waiting: 3)
+                  doing: "Building the dedicated-server profile for SP-9", last: "SP-9 plan revised for all five of Scout's findings.", five: 73, week: 31, waiting: 4,
+                  hold: AgentHold(manual: true, until: nil, reason: "Kewz: pause Sage."), failed: 1)
         ]
     }
 

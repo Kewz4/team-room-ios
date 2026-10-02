@@ -146,6 +146,19 @@ final class TeamRoomUITests: XCTestCase {
         app = launch(["-ui-large-type", "-ui-open-agents"])
         XCTAssertTrue(app.buttons["agent-row-claude-assets"].waitForExistence(timeout: 10))
         capture("20-large-type-agents", app)
+        // 1.1: the lower cards carry the stress case from Kewz's phone (hold + queued + failed + three usage bars).
+        app.swipeUp()
+        capture("21-large-type-agents-lower", app)
+    }
+
+    /// 1.1 steering: while a Team Room turn runs, the composer says the message goes into that turn.
+    func testSteeringComposerOnARunningTurn() {
+        let app = launch(["-ui-open-agents"])
+        let polaris = app.buttons["agent-row-claude-polaris"]
+        XCTAssertTrue(polaris.waitForExistence(timeout: 10))
+        polaris.tap()
+        let shown = app.descendants(matching: .any)["steer-hint"].waitForExistence(timeout: 10)
+        capture(shown ? "22-steer-composer" : "22-steer-composer-hint-missing", app)
     }
 
     func testFailedDeliverySwipeEditDeleteAndUndo() {

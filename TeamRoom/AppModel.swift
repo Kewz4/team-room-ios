@@ -459,14 +459,25 @@ final class AppModel {
 
     // MARK: - Agent actions
 
-    func send(_ text: String, to agentId: String) async {
+    /// `mode`: nil lets the bridge decide (1.1 bridges steer Kewz's message into a running Team Room turn),
+    /// "queue" waits for the turn to end, "steer" asks for steering explicitly.
+    func send(_ text: String, to agentId: String, mode: String? = nil) async {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         sendingTo.insert(agentId)
         defer { sendingTo.remove(agentId) }
         do {
-            try await client.send(agentId: agentId, text: trimmed, id: UUID().uuidString.lowercased(), mode: nil)
+            try await client.send(agentId: agentId, text: trimmed, id: UUID().uuidString.lowercased(), mode: mode)
             drafts[agentId] = ""
+            scheduleConversationRefresh(agentId)
+        } catch {
+            actionError = (error as? ClientError)?.message ?? error.localizedDescription
+        }
+    }
+
+    func steerQueued(id: String, agentId: String) async {
+        do {
+            try await client.steer(id: id)
             scheduleConversationRefresh(agentId)
         } catch {
             actionError = (error as? ClientError)?.message ?? error.localizedDescription

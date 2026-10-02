@@ -146,6 +146,8 @@ struct SettingsView: View {
         }
         if let fiveHour = agent.usage?.fiveHour { parts.append("5-hour \(Int(fiveHour))%") }
         if let weekly = agent.usage?.weekly { parts.append("weekly \(Int(weekly))%") }
+        if let monthly = agent.usage?.monthly { parts.append("monthly \(Int(monthly))%") }
+        if let reason = agent.limit?.reason, !reason.isEmpty, agent.limit?.level != "ok" { parts.append(reason) }
         if let reset = agent.usage?.resetAt, let date = TimeFormat.date(reset) {
             parts.append("resets \(date.formatted(date: .abbreviated, time: .shortened))")
         }
