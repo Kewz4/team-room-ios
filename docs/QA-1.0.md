@@ -40,11 +40,11 @@ Legend: **U** unit test (`Tests/`), **UI** UI test with screenshot (`UITests/`),
 | P1 | Team refresh is small | D: `/api/team` vs `/api/state` | 10.4 KB vs 1.03 MB (≈99% smaller; 3 KB vs 262 KB gzipped) |
 | P2 | Unchanged conversations cost nothing to revalidate | D: ETag → 304 | 304 |
 | P3 | Streaming sends only new text, only for the open conversation | B `live-v2.test.mjs` | deltas + per-client subscriptions |
-| P4 | Building a 2,000-row conversation is fast | P `testPerformanceBuildingALongConversation` | (CI) |
-| P5 | Markdown is rendered once and cached, off the main thread for history | P `testPerformanceRenderingLongMarkdown` | (CI) |
-| P6 | Decoding a heavy conversation payload | P `testPerformanceDecodingAConversationPayload` | (CI) |
-| P7 | Scrolling a long conversation does not hitch | P `testScrollHitchesInALongConversation` (hitch ratio) | (CI) |
-| P8 | Launch time | P `testLaunchTime` | (CI) |
+| P4 | Building a 2,000-row conversation is fast | P `testPerformanceBuildingALongConversation` | 0.009 s (was 0.171 s before the fast timestamp parser); peak ≈ 55 MB |
+| P5 | Markdown is rendered once and cached, off the main thread for history | P `testPerformanceRenderingLongMarkdown` | 0.10 s for 40 long messages, then cached |
+| P6 | Decoding a heavy conversation payload | P `testPerformanceDecodingAConversationPayload` | ≈ 1 ms |
+| P7 | Scrolling a long conversation does not hitch | P `testScrollHitchesInALongConversation` (hitch ratio) | deceleration 2.43 s, steady across runs (the simulator reports no hitch ratio; measure on a device) |
+| P8 | Launch time | P `testLaunchTime` | 3.6 s average on the CI simulator (cold, instrumented) |
 | P9 | Images cannot exhaust memory | `ImageStore`: NSCache 48 MB cap, ImageIO downsampling (700 px inline, 2400 px viewer) | design |
 
 ## Reliability
@@ -69,4 +69,17 @@ Legend: **U** unit test (`Tests/`), **UI** UI test with screenshot (`UITests/`),
 
 ## Results
 
-Filled after the release CI run.
+Release run [36967774785](https://github.com/Kewz4/team-room-ios/actions/runs/36967774785) (iPhone 17 Pro simulator, iOS 26):
+**34 unit tests and 10 UI tests, 0 failures**; bridge 179/179 tests and 16/16 dry-run API checks.
+
+The populated screenshots were reviewed screen by screen (21 per run). The review found and fixed:
+- **The jump-to-latest button showed at the newest message and in an empty chat.** The at-bottom test mixed SwiftUI
+  geometry conventions. It now measures with UIKit's own offset, size and insets, appears only after a moment away from
+  the end, and UI tests assert that it is absent at the bottom (chat, empty chat, room).
+- **The room test's swipe never scrolled.** It landed on the pinned decision card. It now drags in the visible messages,
+  so the jump-button check is real.
+- **The usage bars ignored Dynamic Type.** They now scale (`@ScaledMetric`).
+- **Earlier polish from the first review:** header text bleed, chat follow while streaming, lore chart clipping, chip
+  truncation, inbox decision icon, large-type names, table width.
+
+`TeamRoom-unsigned.ipa` SHA-256 `cd2ac6621adc2911fb735cbb6ba0070f28a488b319637b611307505b5a70f1bb` (1,625,961 bytes).
