@@ -61,6 +61,11 @@ struct Pill: View {
 /// Compact 5-hour + weekly usage bars, colour-coded by pressure.
 struct UsageBars: View {
     let usage: AgentUsage?
+    // Scales with Dynamic Type (the 1.0 large-text screenshot showed fixed 10 pt labels).
+    @ScaledMetric(relativeTo: .caption2) private var textSize: CGFloat = 10
+    @ScaledMetric(relativeTo: .caption2) private var labelWidth: CGFloat = 14
+    @ScaledMetric(relativeTo: .caption2) private var valueWidth: CGFloat = 30
+    @ScaledMetric(relativeTo: .caption2) private var barWidth: CGFloat = 40
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 3) {
@@ -81,17 +86,17 @@ struct UsageBars: View {
     private func bar(label: String, value: Double) -> some View {
         HStack(spacing: Tokens.Space.xs) {
             Text(label)
-                .font(.system(size: 10))
+                .font(.system(size: textSize))
                 .foregroundStyle(Tokens.textTertiary)
-                .frame(width: 14, alignment: .trailing)
+                .frame(width: labelWidth, alignment: .trailing)
             ZStack(alignment: .leading) {
-                Capsule().fill(Tokens.surfaceAlt).frame(width: 40, height: 4)
-                Capsule().fill(Self.color(value)).frame(width: max(3, 40 * min(max(value, 0), 100) / 100), height: 4)
+                Capsule().fill(Tokens.surfaceAlt).frame(width: barWidth, height: 4)
+                Capsule().fill(Self.color(value)).frame(width: max(3, barWidth * min(max(value, 0), 100) / 100), height: 4)
             }
             Text("\(Int(value.rounded()))%")
-                .font(.system(size: 10, weight: .medium, design: .rounded).monospacedDigit())
+                .font(.system(size: textSize, weight: .medium, design: .rounded).monospacedDigit())
                 .foregroundStyle(Tokens.textSecondary)
-                .frame(width: 30, alignment: .trailing)
+                .frame(width: valueWidth, alignment: .trailing)
         }
     }
 

@@ -12,6 +12,13 @@ final class ScrollHandle {
                          view.contentSize.height - view.bounds.height + view.adjustedContentInset.bottom)
         view.setContentOffset(CGPoint(x: view.contentOffset.x, y: offset), animated: false)
     }
+
+    /// How far the end of the content lies below the visible area (zero or less when the end is in view), measured
+    /// in UIKit's own terms, where offset, size and insets are defined together.
+    var distanceFromBottom: CGFloat? {
+        guard let view else { return nil }
+        return view.contentSize.height + view.adjustedContentInset.bottom - (view.contentOffset.y + view.bounds.height)
+    }
 }
 
 /// Access only this conversation's public UIScrollView to jump to its measured end.

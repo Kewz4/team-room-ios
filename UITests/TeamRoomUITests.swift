@@ -18,11 +18,18 @@ final class TeamRoomUITests: XCTestCase {
         app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", value)).firstMatch
     }
 
+    /// At the newest message there is nothing to jump to (1.0 review: the button showed at the bottom and in an empty chat).
+    private func assertNoJumpButton(_ app: XCUIApplication, _ message: String) {
+        let gone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: app.buttons["jump-latest"])
+        XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 3), .completed, message)
+    }
+
     func testTeamChatShowsAnswersHandOverAndStreaming() {
         let app = launch()
         XCTAssertTrue(text(app, containing: "Here's the team right now").waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["Why Nova answered"].waitForExistence(timeout: 5), "a hand-over explains who answered")
         XCTAssertTrue(text(app, containing: "Reading PLAN.json").exists, "the answer in progress shows what the coordinator is doing")
+        assertNoJumpButton(app, "following a streaming answer shows no jump-to-latest button")
         capture("01-team-chat", app)
         app.buttons["Why Nova answered"].tap()
         XCTAssertTrue(text(app, containing: "Polaris is answering another question").waitForExistence(timeout: 5))
@@ -34,6 +41,7 @@ final class TeamRoomUITests: XCTestCase {
         let app = launch(["-ui-empty-chat"])
         XCTAssertTrue(text(app, containing: "Ask the team anything").waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons.matching(identifier: "suggestion").firstMatch.exists)
+        assertNoJumpButton(app, "an empty chat has nothing to jump to")
         capture("03-team-chat-empty", app)
     }
 
@@ -47,6 +55,7 @@ final class TeamRoomUITests: XCTestCase {
         let picture = app.buttons["Fixture artwork"]
         XCTAssertTrue(picture.waitForExistence(timeout: 10))
         XCTAssertTrue(app.descendants(matching: .any)["markdown-table"].exists)
+        assertNoJumpButton(app, "a room opens at its newest message")
         capture("05-agent-room", app)
         let scroll = app.scrollViews["conversation-scroll"]
         scroll.swipeDown(velocity: .fast)

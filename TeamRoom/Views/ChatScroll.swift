@@ -14,6 +14,7 @@ struct ChatScroll<Content: View>: View {
     @ViewBuilder let content: () -> Content
 
     @State private var atBottom = true
+    @State private var showJump = false
     @State private var following = true
     @State private var userScrolling = false
     @State private var handle = ScrollHandle()
@@ -39,14 +40,16 @@ struct ChatScroll<Content: View>: View {
             .defaultScrollAnchor(.bottom, for: .initialOffset)
             .scrollDismissesKeyboard(.interactively)
             .scrollEdgeEffectStyle(.hard, for: .top)
-            .onScrollGeometryChange(for: Bool.self) { geometry in
-                // Distance from the deepest reachable offset; short content (nothing to scroll) counts as at the bottom.
-                let maxOffset = max(-geometry.contentInsets.top,
-                                    geometry.contentSize.height + geometry.contentInsets.bottom - geometry.containerSize.height)
-                return maxOffset - geometry.contentOffset.y < 80
-            } action: { _, value in
-                atBottom = value
-                if userScrolling { following = value }
+            .onScrollGeometryChange(for: [CGFloat].self) { geometry in
+                // Any change of position, size or insets. The distance itself comes from UIKit (ScrollHandle): mixing
+                // SwiftUI's geometry conventions showed the jump button at the bottom and in an empty chat.
+                [geometry.contentOffset.y, geometry.contentSize.height, geometry.containerSize.height,
+                 geometry.contentInsets.top, geometry.contentInsets.bottom]
+            } action: { _, _ in
+                // Short content (nothing to scroll) and a not-yet-attached view count as at the bottom.
+                let value = (handle.distanceFromBottom ?? 0) < 80
+                if value != atBottom { atBottom = value }
+                if userScrolling && following != value { following = value }
             }
             .onScrollGeometryChange(for: CGFloat.self) { geometry in
                 geometry.contentSize.height
@@ -77,8 +80,15 @@ struct ChatScroll<Content: View>: View {
                 withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo(id, anchor: .center) }
                 focus = nil
             }
+            .task(id: atBottom) {
+                // Appear only when away from the end for a moment, so a growing answer that is being followed
+                // never flickers the button; disappear at once on return.
+                guard !atBottom else { showJump = false; return }
+                try? await Task.sleep(for: .milliseconds(250))
+                if !Task.isCancelled && !atBottom { showJump = true }
+            }
             .overlay(alignment: .bottomTrailing) {
-                if !atBottom {
+                if showJump {
                     Button(action: jumpToLatest) {
                         Image(systemName: "arrow.down")
                             .font(.system(size: 15, weight: .semibold))
@@ -94,7 +104,7 @@ struct ChatScroll<Content: View>: View {
                     .transition(.scale.combined(with: .opacity))
                 }
             }
-            .animation(.easeOut(duration: 0.15), value: atBottom)
+            .animation(.easeOut(duration: 0.15), value: showJump)
         }
     }
 
