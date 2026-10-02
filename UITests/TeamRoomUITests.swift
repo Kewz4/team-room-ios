@@ -151,6 +151,18 @@ final class TeamRoomUITests: XCTestCase {
         capture("21-large-type-agents-lower", app)
     }
 
+    /// 1.1.1: Nimbus (cloud engineer, a cloud session the room reports from team-hub/nimbus) has its own card and colour.
+    func testNimbusCardInAgentsList() {
+        let app = launch(["-ui-open-agents"])
+        XCTAssertTrue(app.buttons["agent-row-claude-assets"].waitForExistence(timeout: 10))
+        let nimbus = app.buttons["agent-row-nimbus"]
+        var swipes = 0
+        while !nimbus.isHittable && swipes < 4 { app.swipeUp(); swipes += 1 }
+        XCTAssertTrue(nimbus.exists, "Nimbus should be listed with the other teammates")
+        XCTAssertTrue(text(app, containing: "Waiting for Polaris").exists)
+        capture("23-agents-nimbus", app)
+    }
+
     /// 1.1 steering: while a Team Room turn runs, the composer says the message goes into that turn.
     func testSteeringComposerOnARunningTurn() {
         let app = launch(["-ui-open-agents"])

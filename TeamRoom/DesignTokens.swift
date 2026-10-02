@@ -107,6 +107,7 @@ enum AgentStyle {
         case "scout": return Color(light: "0F8F78", dark: "45C9AA")
         case "flint": return Color(light: "D9621A", dark: "FF9A52")
         case "sage": return Color(light: "3F8A3B", dark: "7FC874")
+        case "nimbus": return Color(light: "C93C6E", dark: "FF84AE")
         case "kewz", "you": return Tokens.accent
         case "coordinator": return Color(light: "5B6472", dark: "A8B0BC")
         default: return Tokens.textSecondary

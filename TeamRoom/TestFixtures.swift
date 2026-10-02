@@ -109,7 +109,10 @@ enum TestFixtures {
                   last: "FIX2-ANNEX2 Tier A packet published.", five: 4, week: 1, waiting: 5, month: 18),
             agent("claude-adventure", "Sage", "Max 5×", "Opus 5.5 · Max", "claude", role: "Principal reviewer", state: "working",
                   doing: "Building the dedicated-server profile for SP-9", last: "SP-9 plan revised for all five of Scout's findings.", five: 73, week: 31, waiting: 4,
-                  hold: AgentHold(manual: true, until: nil, reason: "Kewz: pause Sage."), failed: 1)
+                  hold: AgentHold(manual: true, until: nil, reason: "Kewz: pause Sage."), failed: 1),
+            agent("nimbus", "Nimbus", "Cloud session · Polaris account", "Opus 5.5 · Max", "cloud", role: "Cloud engineer", state: "idle",
+                  last: "The bridge to msi works. Waiting for Polaris's first assignment.",
+                  summary: TaskStatus(kind: "idle", label: "Last report", detail: "The bridge to msi works. Waiting for Polaris's first assignment.", at: "2026-10-02T15:36:00Z", eventId: nil))
         ]
     }
 
