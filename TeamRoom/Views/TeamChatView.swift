@@ -76,6 +76,9 @@ struct TeamChatView: View {
                         Text(coordinator.label)
                             .font(.caption2)
                             .foregroundStyle(Tokens.textSecondary)
+                            // 1.1.2: four coordinators share the title row; shrink a name rather than wrap it letter by letter.
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
                     }
                     .accessibilityElement(children: .combine)
                     .accessibilityLabel("\(coordinator.label) \(coordinator.available == false ? "unavailable" : coordinator.answering == true ? "answering" : "available")")
@@ -85,7 +88,7 @@ struct TeamChatView: View {
     }
 
     private var defaultCoordinators: [Coordinator] {
-        [Coordinator(name: "polaris", label: "Polaris"), Coordinator(name: "nova", label: "Nova"), Coordinator(name: "atlas", label: "Atlas")]
+        [Coordinator(name: "polaris", label: "Polaris"), Coordinator(name: "nimbus", label: "Nimbus"), Coordinator(name: "nova", label: "Nova"), Coordinator(name: "atlas", label: "Atlas")]
     }
 
     private var emptyState: some View {
@@ -93,6 +96,7 @@ struct TeamChatView: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: -8) {
                     AgentAvatar(worker: "polaris", size: 34)
+                    AgentAvatar(worker: "nimbus", size: 34)
                     AgentAvatar(worker: "nova", size: 34)
                     AgentAvatar(worker: "atlas", size: 34)
                 }

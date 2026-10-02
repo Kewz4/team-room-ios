@@ -27,11 +27,11 @@ final class TeamRoomUITests: XCTestCase {
     func testTeamChatShowsAnswersHandOverAndStreaming() {
         let app = launch()
         XCTAssertTrue(text(app, containing: "Here's the team right now").waitForExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["Why Nova answered"].waitForExistence(timeout: 5), "a hand-over explains who answered")
+        XCTAssertTrue(app.buttons["Why Nimbus answered"].waitForExistence(timeout: 5), "a hand-over explains who answered")
         XCTAssertTrue(text(app, containing: "Reading PLAN.json").exists, "the answer in progress shows what the coordinator is doing")
         assertNoJumpButton(app, "following a streaming answer shows no jump-to-latest button")
         capture("01-team-chat", app)
-        app.buttons["Why Nova answered"].tap()
+        app.buttons["Why Nimbus answered"].tap()
         XCTAssertTrue(text(app, containing: "Polaris is answering another question").waitForExistence(timeout: 5))
         capture("02-team-chat-handover", app)
         XCTAssertTrue(app.buttons["Stop answer"].exists, "the send button turns into stop while a coordinator answers")

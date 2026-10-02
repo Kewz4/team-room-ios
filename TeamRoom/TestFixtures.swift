@@ -56,6 +56,7 @@ enum TestFixtures {
 
     static let coordinators = [
         Coordinator(name: "polaris", label: "Polaris", role: "Lead coordinator", agentId: "claude-polaris", available: true, note: "Polaris is available", answering: false),
+        Coordinator(name: "nimbus", label: "Nimbus", role: "Cloud engineer · coordinator", agentId: "nimbus", available: true, note: "Nimbus is available", answering: false),
         Coordinator(name: "nova", label: "Nova", role: "Creative lead · backup coordinator", agentId: "claude-assets", available: true, note: "Nova is available", answering: false),
         Coordinator(name: "atlas", label: "Atlas", role: "Engineering lead", agentId: "gpt-world", available: true, note: "Atlas uses the shared reserve pool", answering: false)
     ]
@@ -110,7 +111,7 @@ enum TestFixtures {
             agent("claude-adventure", "Sage", "Max 5×", "Opus 5.5 · Max", "claude", role: "Principal reviewer", state: "working",
                   doing: "Building the dedicated-server profile for SP-9", last: "SP-9 plan revised for all five of Scout's findings.", five: 73, week: 31, waiting: 4,
                   hold: AgentHold(manual: true, until: nil, reason: "Kewz: pause Sage."), failed: 1),
-            agent("nimbus", "Nimbus", "Cloud session · Polaris account", "Opus 5.5 · Max", "cloud", role: "Cloud engineer", state: "idle",
+            agent("nimbus", "Nimbus", "Cloud session · Polaris account", "Opus 5.5 · Max", "cloud", role: "Cloud engineer · coordinator", state: "idle",
                   last: "The bridge to msi works. Waiting for Polaris's first assignment.",
                   summary: TaskStatus(kind: "idle", label: "Last report", detail: "The bridge to msi works. Waiting for Polaris's first assignment.", at: "2026-10-02T15:36:00Z", eventId: nil))
         ]
@@ -143,8 +144,8 @@ enum TestFixtures {
             | N8 save guard | Tests pass, no game run yet |
 
             The next big step is Atlas wiring the other 23 after the October 6 reset.
-            """, createdAt: "2026-10-02T03:24:01Z", startedAt: "2026-10-02T03:24:01Z", completedAt: "2026-10-02T03:25:10Z", state: "answered", replyTo: "q2", responder: "nova",
-                        claim: RoomClaim(responder: "nova", reason: "Nova is answering because Polaris is answering another question.", considered: nil, at: nil)),
+            """, createdAt: "2026-10-02T03:24:01Z", startedAt: "2026-10-02T03:24:01Z", completedAt: "2026-10-02T03:25:10Z", state: "answered", replyTo: "q2", responder: "nimbus",
+                        claim: RoomClaim(responder: "nimbus", reason: "Nimbus is answering because Polaris is answering another question.", considered: nil, at: nil)),
             RoomMessage(id: "q3", role: "user", text: "What do you need from me?", createdAt: "2026-10-02T03:29:00Z", state: "answered"),
             RoomMessage(id: "a3", role: "coordinator", text: "Three decisions are waiting on you. The most urgent is", createdAt: "2026-10-02T03:29:01Z", startedAt: "2026-10-02T03:29:01Z",
                         state: "answering", replyTo: "q3", responder: "polaris",
