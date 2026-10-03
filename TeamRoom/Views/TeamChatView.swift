@@ -87,6 +87,15 @@ struct TeamChatView: View {
         }
     }
 
+    /// The room's live roster (1.1.2: the empty chat no longer hard-codes three coordinators).
+    private var roster: [Coordinator] { model.room.coordinators.isEmpty ? defaultCoordinators : model.room.coordinators }
+
+    /// "Polaris, Nimbus, Nova or Atlas".
+    private func orList(_ items: [String]) -> String {
+        guard let last = items.last else { return "A coordinator" }
+        return items.count == 1 ? last : items.dropLast().joined(separator: ", ") + " or " + last
+    }
+
     private var defaultCoordinators: [Coordinator] {
         [Coordinator(name: "polaris", label: "Polaris"), Coordinator(name: "nimbus", label: "Nimbus"), Coordinator(name: "nova", label: "Nova"), Coordinator(name: "atlas", label: "Atlas")]
     }
@@ -95,15 +104,14 @@ struct TeamChatView: View {
         VStack(alignment: .leading, spacing: Tokens.Space.m) {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: -8) {
-                    AgentAvatar(worker: "polaris", size: 34)
-                    AgentAvatar(worker: "nimbus", size: 34)
-                    AgentAvatar(worker: "nova", size: 34)
-                    AgentAvatar(worker: "atlas", size: 34)
+                    ForEach(roster) { coordinator in
+                        AgentAvatar(worker: coordinator.name, size: 34)
+                    }
                 }
                 Text("Ask the team anything")
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(Tokens.textPrimary)
-                Text("Polaris, Nova or Atlas answers — whoever is free — using the live state of every teammate, the plan and the board. Start with @Polaris, @Nova or @Atlas to pick one.")
+                Text("\(orList(roster.map(\.label))) answers — whoever is free — using the live state of every teammate, the plan and the board. Start with \(orList(roster.map { "@" + $0.label })) to pick one.")
                     .font(TypeScale.footnote)
                     .foregroundStyle(Tokens.textSecondary)
             }
