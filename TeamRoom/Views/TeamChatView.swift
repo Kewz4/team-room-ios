@@ -36,15 +36,18 @@ struct TeamChatView: View {
             .toolbar {
                 SettingsToolbarItem(router: model.router)
                 ToolbarItem(placement: .principal) { header }
+                // 1.2: while typing, the hide-keyboard button takes the More menu's place, so the five coordinator
+                // names keep their room in the title.
                 ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Button { model.router.tab = .board } label: { Label("Project board", systemImage: "chart.bar.doc.horizontal") }
-                        Button { model.refresh() } label: { Label("Refresh", systemImage: "arrow.clockwise") }
-                    } label: { Image(systemName: "ellipsis") }
-                    .accessibilityLabel("More")
-                }
-                if composerFocused {
-                    ToolbarItem(placement: .topBarTrailing) { HideKeyboardButton { composerFocused = false } }
+                    if composerFocused {
+                        HideKeyboardButton { composerFocused = false }
+                    } else {
+                        Menu {
+                            Button { model.router.tab = .board } label: { Label("Project board", systemImage: "chart.bar.doc.horizontal") }
+                            Button { model.refresh() } label: { Label("Refresh", systemImage: "arrow.clockwise") }
+                        } label: { Image(systemName: "ellipsis") }
+                        .accessibilityLabel("More")
+                    }
                 }
             }
             .onAppear {

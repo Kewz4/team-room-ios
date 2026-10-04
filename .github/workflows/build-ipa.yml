@@ -34,15 +34,14 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
-      - name: Use the on-screen keyboard in the simulator
-        # 1.2: the notes and composer tests check the real keyboard, which a connected hardware keyboard hides.
-        run: defaults write com.apple.iphonesimulator ConnectHardwareKeyboard -bool false
-
       - name: Unit, UI, screenshot and performance tests
         run: |
           set -o pipefail
           DEVICE=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; rows=[v for k in sorted(d,reverse=True) if "iOS-" in k for v in d[k] if v.get("isAvailable") and v["name"].startswith("iPhone")]; print(rows[0]["udid"] if rows else "")')
           test -n "$DEVICE"
+          # 1.2: boot first and skip the one-time "slide to type" introduction, so the keyboard checks see the keyboard.
+          xcrun simctl bootstatus "$DEVICE" -b
+          xcrun simctl spawn "$DEVICE" defaults write com.apple.keyboard.preferences DidShowContinuousPathIntroduction -bool true || true
           xcodebuild test -project TeamRoom.xcodeproj -scheme TeamRoom \
             -jobs 1 \
             -destination "platform=iOS Simulator,id=$DEVICE" \

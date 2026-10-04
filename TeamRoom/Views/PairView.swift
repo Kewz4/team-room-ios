@@ -10,7 +10,7 @@ struct PairView: View {
             VStack(alignment: .leading, spacing: Tokens.Space.l) {
                 VStack(alignment: .leading, spacing: Tokens.Space.s) {
                     HStack(spacing: -10) {
-                        ForEach(["nova", "atlas", "scout", "flint", "sage"], id: \.self) { worker in
+                        ForEach(["polaris", "sage", "vega", "orion", "atlas", "nova", "scout", "flint"], id: \.self) { worker in
                             AgentAvatar(worker: worker, size: 40)
                                 .overlay(Circle().stroke(Tokens.background, lineWidth: 2))
                         }

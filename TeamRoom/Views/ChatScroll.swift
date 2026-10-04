@@ -59,6 +59,14 @@ struct ChatScroll<Content: View>: View {
                 guard new > old, following, !userScrolling else { return }
                 handle.bottom()
             }
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                geometry.containerSize.height - geometry.contentInsets.top - geometry.contentInsets.bottom
+            } action: { old, new in
+                // 1.2: the keyboard opening (the visible height shrinking) keeps the newest line in view while
+                // following, instead of leaving it under the keyboard behind the jump button.
+                guard new < old, following, !userScrolling else { return }
+                handle.bottom()
+            }
             .onScrollPhaseChange { _, phase in
                 if phase == .tracking || phase == .interacting || phase == .decelerating {
                     userScrolling = true

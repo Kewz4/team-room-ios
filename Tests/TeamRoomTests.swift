@@ -133,6 +133,15 @@ final class TeamRoomTests: XCTestCase {
         XCTAssertEqual(GoalTrack.group(goals.map { var goal = $0; goal.track = nil; return goal }).count, 1, "a plan without tracks is one list")
     }
 
+    func testGoalTrackWeightsAndValuesAreReadLikeThePC() throws {
+        let json = #"[{"id":"economy","title":"Economy rework","percent":5,"weight":"15","track":"pack"},{"id":"zero","title":"Zero weight","percent":100,"weight":0,"track":"pack"},{"id":"odd","title":"Odd track","percent":50,"track":7}]"#
+        let goals = try JSONDecoder().decode([Goal].self, from: Data(json.utf8))
+        XCTAssertEqual(goals.map(\.id), ["economy", "zero", "odd"], "a hand-edited weight or track keeps the goal")
+        XCTAssertEqual(goals[0].weight, 15)
+        XCTAssertNil(goals[2].track)
+        XCTAssertEqual(GoalTrack.group(goals)[0].percent, 11, "(5 x 15 + 100 x 1) / 16: a weight of 0 counts as 1, like the PC")
+    }
+
     // MARK: - Navigation, notes, stores
 
     @MainActor func testDeepLinksFromNotificationsOpenTheRightScreen() {

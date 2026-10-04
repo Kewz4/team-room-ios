@@ -251,6 +251,30 @@ struct Goal: Codable, Hashable, Identifiable {
     var weight: Double?
 }
 
+extension Goal {
+    /// 1.2: track and weight are read leniently, so a hand-edited value (a weight of "15", a stray track) cannot
+    /// drop the goal from the board; the other fields decode as before.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        title = try c.decode(String.self, forKey: .title)
+        summary = try c.decodeIfPresent(String.self, forKey: .summary)
+        owner = try c.decodeIfPresent(String.self, forKey: .owner)
+        ownerName = try c.decodeIfPresent(String.self, forKey: .ownerName)
+        status = try c.decodeIfPresent(String.self, forKey: .status)
+        statusLabel = try c.decodeIfPresent(String.self, forKey: .statusLabel)
+        percent = try c.decodeIfPresent(Int.self, forKey: .percent)
+        method = try c.decodeIfPresent(String.self, forKey: .method)
+        metricLabel = try c.decodeIfPresent(String.self, forKey: .metricLabel)
+        milestoneCount = try c.decodeIfPresent(Int.self, forKey: .milestoneCount)
+        doneMilestones = try c.decodeIfPresent(Int.self, forKey: .doneMilestones)
+        note = try c.decodeIfPresent(String.self, forKey: .note)
+        track = try? c.decodeIfPresent(String.self, forKey: .track)
+        weight = (try? c.decodeIfPresent(Double.self, forKey: .weight))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .weight)).flatMap { Double($0) }
+    }
+}
+
 struct Milestone: Codable, Hashable, Identifiable {
     var id: String
     var goal: String?

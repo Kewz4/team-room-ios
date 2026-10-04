@@ -33,8 +33,11 @@ final class TeamRoomUITests: XCTestCase {
         var count = 0
         var last: CGFloat?
         while !placed(top()) && count < swipes {
-            let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: up ? 0.66 : 0.34))
-            let to = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: up ? 0.34 : 0.66))
+            // Once the element is known, drag towards it: back down when its top is already above the band.
+            var dragUp = up
+            if let y = top() { dragUp = y >= window.height * 0.5 }
+            let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: dragUp ? 0.66 : 0.34))
+            let to = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: dragUp ? 0.34 : 0.66))
             from.press(forDuration: 0.05, thenDragTo: to, withVelocity: .slow, thenHoldForDuration: 0.2)
             count += 1
             let now = top()
@@ -84,7 +87,12 @@ final class TeamRoomUITests: XCTestCase {
         let composer = anyElement(app, "team-composer")
         XCTAssertTrue(composer.waitForExistence(timeout: 5))
         composer.tap()
+        XCTAssertTrue(app.buttons["hide-keyboard"].waitForExistence(timeout: 5))
+        Thread.sleep(forTimeInterval: 1.5)
+        XCTAssertFalse(app.buttons["jump-latest"].exists, "opening the keyboard keeps the end of the chat in view")
+        XCTAssertFalse(app.buttons["More"].exists, "while typing, the hide-keyboard button takes the More menu's place")
         assertHideKeyboardButtonWorks(app, "03b-team-chat-typing")
+        XCTAssertTrue(app.buttons["More"].waitForExistence(timeout: 5), "the More menu returns with the keyboard put away")
     }
 
     func testAgentsListAndRoomWithTableImageAndReport() {
@@ -149,11 +157,10 @@ final class TeamRoomUITests: XCTestCase {
         app.swipeUp()
         capture("11b-board-charts-and-work", app)
         let goal = app.buttons["goal-engine"]
-        if scroll(to: goal, app, up: false, swipes: 16), goal.isHittable {
-            goal.tap()
-            XCTAssertTrue(text(app, containing: "N8 save-guard correction").waitForExistence(timeout: 5))
-            capture("12-goal-detail", app)
-        }
+        XCTAssertTrue(scroll(to: goal, app, up: false, swipes: 16) && goal.isHittable, "the engine goal can be opened")
+        goal.tap()
+        XCTAssertTrue(text(app, containing: "N8 save-guard correction").waitForExistence(timeout: 5))
+        capture("12-goal-detail", app)
     }
 
     func testNotesListAndEditor() {
@@ -167,6 +174,9 @@ final class TeamRoomUITests: XCTestCase {
         capture("14-note-editor", app)
         app.navigationBars.buttons.firstMatch.tap()
         XCTAssertTrue(text(app, containing: "Groceries").waitForExistence(timeout: 5))
+        // 1.2: the editor hides the tab bar; it must come back on the list.
+        let tabBack = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == true AND hittable == true"), object: app.tabBars.firstMatch)
+        XCTAssertEqual(XCTWaiter.wait(for: [tabBack], timeout: 5), .completed, "the tab bar comes back after the editor")
     }
 
     /// 1.2 (Kewz, 2026-10-04): "allow me to scroll down on the notes, there's a point where I can't scroll down" and
@@ -189,10 +199,9 @@ final class TeamRoomUITests: XCTestCase {
         // With the keyboard the text view ends above it, so the last line can still scroll into view.
         editor.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         let keyboard = app.keyboards.firstMatch
-        if keyboard.waitForExistence(timeout: 5) {
-            let above = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in editor.frame.maxY <= keyboard.frame.minY + 1 }, object: nil)
-            XCTAssertEqual(XCTWaiter.wait(for: [above], timeout: 5), .completed, "the note ends above the keyboard, not under it")
-        }
+        XCTAssertTrue(keyboard.waitForExistence(timeout: 5), "the on-screen keyboard shows")
+        let above = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in editor.frame.maxY <= keyboard.frame.minY + 1 }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [above], timeout: 5), .completed, "the note ends above the keyboard, not under it")
         for _ in 0..<8 { editor.swipeUp(velocity: .fast) }
         capture("25-long-note-end-keyboard", app)
         assertHideKeyboardButtonWorks(app, nil)

@@ -402,7 +402,11 @@ struct GoalTrack: Identifiable {
     }
 
     var percent: Int {
-        let weights = goals.map { max($0.weight ?? 1, 0) }
+        // Like the PC (Number(weight) || 1): no weight, or 0, counts as 1.
+        let weights = goals.map { goal -> Double in
+            if let weight = goal.weight, weight > 0 { return weight }
+            return 1
+        }
         let total = weights.reduce(0, +)
         guard total > 0 else { return 0 }
         let sum = zip(goals, weights).reduce(0.0) { $0 + Double($1.0.percent ?? 0) * $1.1 }

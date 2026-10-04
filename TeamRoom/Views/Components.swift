@@ -125,7 +125,8 @@ struct UsageBars: View {
     let usage: AgentUsage?
     // Scales with Dynamic Type (the 1.0 large-text screenshot showed fixed 10 pt labels).
     @ScaledMetric(relativeTo: .caption2) private var textSize: CGFloat = 10
-    @ScaledMetric(relativeTo: .caption2) private var labelWidth: CGFloat = 14
+    // 1.2: 18, not 14: "mo" wrapped one letter per line.
+    @ScaledMetric(relativeTo: .caption2) private var labelWidth: CGFloat = 18
     @ScaledMetric(relativeTo: .caption2) private var valueWidth: CGFloat = 30
     @ScaledMetric(relativeTo: .caption2) private var barWidth: CGFloat = 40
 
@@ -157,6 +158,7 @@ struct UsageBars: View {
             Text(label)
                 .font(.system(size: textSize))
                 .foregroundStyle(Tokens.textTertiary)
+                .lineLimit(1)
                 .frame(width: labelWidth, alignment: .trailing)
             ZStack(alignment: .leading) {
                 Capsule().fill(Tokens.surfaceAlt).frame(width: barWidth, height: 4)
