@@ -89,7 +89,7 @@ final class TeamRoomUITests: XCTestCase {
         composer.tap()
         XCTAssertTrue(app.buttons["hide-keyboard"].waitForExistence(timeout: 5))
         Thread.sleep(forTimeInterval: 1.5)
-        XCTAssertFalse(app.buttons["jump-latest"].exists, "opening the keyboard keeps the end of the chat in view")
+        XCTAssertFalse(app.buttons["jump-latest"].exists, "an empty chat shows no jump button, even with the keyboard up")
         XCTAssertFalse(app.buttons["More"].exists, "while typing, the hide-keyboard button takes the More menu's place")
         assertHideKeyboardButtonWorks(app, "03b-team-chat-typing")
         XCTAssertTrue(app.buttons["More"].waitForExistence(timeout: 5), "the More menu returns with the keyboard put away")

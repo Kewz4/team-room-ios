@@ -11,6 +11,8 @@ struct ChatScroll<Content: View>: View {
     let followKey: Int
     /// Scrolls to this row id when set (deep links, notification taps).
     @Binding var focus: String?
+    /// 1.2: off for an empty chat, whose suggestions can reach under the keyboard but hold no newer message to jump to.
+    var jumpEnabled = true
     @ViewBuilder let content: () -> Content
 
     @State private var atBottom = true
@@ -59,14 +61,6 @@ struct ChatScroll<Content: View>: View {
                 guard new > old, following, !userScrolling else { return }
                 handle.bottom()
             }
-            .onScrollGeometryChange(for: CGFloat.self) { geometry in
-                geometry.containerSize.height - geometry.contentInsets.top - geometry.contentInsets.bottom
-            } action: { old, new in
-                // 1.2: the keyboard opening (the visible height shrinking) keeps the newest line in view while
-                // following, instead of leaving it under the keyboard behind the jump button.
-                guard new < old, following, !userScrolling else { return }
-                handle.bottom()
-            }
             .onScrollPhaseChange { _, phase in
                 if phase == .tracking || phase == .interacting || phase == .decelerating {
                     userScrolling = true
@@ -96,7 +90,7 @@ struct ChatScroll<Content: View>: View {
                 if !Task.isCancelled && !atBottom { showJump = true }
             }
             .overlay(alignment: .bottomTrailing) {
-                if showJump {
+                if showJump && jumpEnabled {
                     Button(action: jumpToLatest) {
                         Image(systemName: "arrow.down")
                             .font(.system(size: 15, weight: .semibold))

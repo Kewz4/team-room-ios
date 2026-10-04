@@ -20,7 +20,7 @@ struct TeamChatView: View {
 
     var body: some View {
         NavigationStack {
-            ChatScroll(followKey: followKey, focus: $focus) {
+            ChatScroll(followKey: followKey, focus: $focus, jumpEnabled: !model.room.messages.isEmpty) {
                 if model.room.messages.isEmpty {
                     emptyState
                 }
