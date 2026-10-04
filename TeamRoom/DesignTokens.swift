@@ -95,6 +95,8 @@ enum AgentStyle {
         case "opencode-world": return "flint"
         case "claude-adventure": return "sage"
         case "claude-polaris": return "polaris"
+        case "claude-vega": return "vega"
+        case "claude-orion": return "orion"
         default: return id
         }
     }
@@ -107,6 +109,10 @@ enum AgentStyle {
         case "scout": return Color(light: "0F8F78", dark: "45C9AA")
         case "flint": return Color(light: "D9621A", dark: "FF9A52")
         case "sage": return Color(light: "3F8A3B", dark: "7FC874")
+        // 1.2 (2026-10-04): Vega and Orion match their avatars in the web Team Room and the Bark notices. Nimbus
+        // retired the same day; his colour stays for his history.
+        case "vega": return Color(light: "B5235A", dark: "F0679E")
+        case "orion": return Color(light: "B8312F", dark: "F06C5B")
         case "nimbus": return Color(light: "C93C6E", dark: "FF84AE")
         case "kewz", "you": return Tokens.accent
         case "coordinator": return Color(light: "5B6472", dark: "A8B0BC")

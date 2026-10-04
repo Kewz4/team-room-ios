@@ -18,6 +18,43 @@ final class TeamRoomUITests: XCTestCase {
         app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", value)).firstMatch
     }
 
+    private func anyElement(_ app: XCUIApplication, _ identifier: String) -> XCUIElement {
+        app.descendants(matching: .any).matching(identifier: identifier).firstMatch
+    }
+
+    /// Drags a third of the screen at a time, holding before lifting so nothing flings past (lazy sections only exist
+    /// once scrolled near), until the element's top sits under the navigation bar in the upper half of the screen,
+    /// or the list cannot scroll further. True when the element's top is then on screen.
+    @discardableResult
+    private func scroll(to element: XCUIElement, _ app: XCUIApplication, up: Bool = true, swipes: Int = 12) -> Bool {
+        let window = app.windows.firstMatch.frame
+        func top() -> CGFloat? { element.exists && !element.frame.isEmpty ? element.frame.minY - window.minY : nil }
+        func placed(_ y: CGFloat?) -> Bool { guard let y else { return false }; return y > window.height * 0.12 && y < window.height * 0.5 }
+        var count = 0
+        var last: CGFloat?
+        while !placed(top()) && count < swipes {
+            let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: up ? 0.66 : 0.34))
+            let to = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: up ? 0.34 : 0.66))
+            from.press(forDuration: 0.05, thenDragTo: to, withVelocity: .slow, thenHoldForDuration: 0.2)
+            count += 1
+            let now = top()
+            if let now, let last, abs(now - last) < 1 { break }
+            last = now
+        }
+        guard let y = top() else { return false }
+        return y > window.height * 0.1 && y < window.height * 0.92
+    }
+
+    /// 1.2: a focused text field shows the hide-keyboard button in the navigation bar, and the button puts it away.
+    private func assertHideKeyboardButtonWorks(_ app: XCUIApplication, _ screenshot: String?) {
+        let hide = app.buttons["hide-keyboard"]
+        XCTAssertTrue(hide.waitForExistence(timeout: 5), "a visible hide-keyboard button while typing")
+        if let screenshot { capture(screenshot, app) }
+        hide.tap()
+        let gone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: hide)
+        XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 5), .completed, "the button goes away with the keyboard")
+    }
+
     /// At the newest message there is nothing to jump to (1.0 review: the button showed at the bottom and in an empty chat).
     private func assertNoJumpButton(_ app: XCUIApplication, _ message: String) {
         let gone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: app.buttons["jump-latest"])
@@ -27,11 +64,11 @@ final class TeamRoomUITests: XCTestCase {
     func testTeamChatShowsAnswersHandOverAndStreaming() {
         let app = launch()
         XCTAssertTrue(text(app, containing: "Here's the team right now").waitForExistence(timeout: 10))
-        XCTAssertTrue(app.buttons["Why Nimbus answered"].waitForExistence(timeout: 5), "a hand-over explains who answered")
+        XCTAssertTrue(app.buttons["Why Vega answered"].waitForExistence(timeout: 5), "a hand-over explains who answered")
         XCTAssertTrue(text(app, containing: "Reading PLAN.json").exists, "the answer in progress shows what the coordinator is doing")
         assertNoJumpButton(app, "following a streaming answer shows no jump-to-latest button")
         capture("01-team-chat", app)
-        app.buttons["Why Nimbus answered"].tap()
+        app.buttons["Why Vega answered"].tap()
         XCTAssertTrue(text(app, containing: "Polaris is answering another question").waitForExistence(timeout: 5))
         capture("02-team-chat-handover", app)
         XCTAssertTrue(app.buttons["Stop answer"].exists, "the send button turns into stop while a coordinator answers")
@@ -43,6 +80,11 @@ final class TeamRoomUITests: XCTestCase {
         XCTAssertTrue(app.buttons.matching(identifier: "suggestion").firstMatch.exists)
         assertNoJumpButton(app, "an empty chat has nothing to jump to")
         capture("03-team-chat-empty", app)
+        // 1.2: while typing, a visible button puts the keyboard away.
+        let composer = anyElement(app, "team-composer")
+        XCTAssertTrue(composer.waitForExistence(timeout: 5))
+        composer.tap()
+        assertHideKeyboardButtonWorks(app, "03b-team-chat-typing")
     }
 
     func testAgentsListAndRoomWithTableImageAndReport() {
@@ -88,21 +130,26 @@ final class TeamRoomUITests: XCTestCase {
 
     func testBoardOverviewChartsWorkAndGoalDetail() {
         let app = launch(["-ui-open-board"])
-        XCTAssertTrue(text(app, containing: "ten-region phase").waitForExistence(timeout: 10))
+        XCTAssertTrue(text(app, containing: "ten regions and a living").waitForExistence(timeout: 10))
         XCTAssertTrue(text(app, containing: "Waiting on you").exists)
         capture("08-board-overview", app)
+        // 1.2: the team lanes list Vega and Orion; Nimbus retired.
+        XCTAssertTrue(scroll(to: app.buttons["lane-claude-orion"], app), "Orion has a lane")
+        XCTAssertTrue(app.buttons["lane-claude-vega"].exists, "Vega has a lane")
+        XCTAssertFalse(app.buttons["lane-nimbus"].exists, "Nimbus retired")
+        capture("09-board-team-lanes", app)
+        // 1.2: the goals sit in the redrawn board's two tracks.
+        XCTAssertTrue(scroll(to: anyElement(app, "track-ten-region"), app), "the ten-region track")
+        XCTAssertTrue(text(app, containing: "Ten-region phase · 42%").exists)
+        capture("10-board-track-ten-region", app)
+        XCTAssertTrue(scroll(to: anyElement(app, "track-pack"), app), "the pack track")
+        XCTAssertTrue(text(app, containing: "Pack improvements · 2%").exists)
+        capture("11-board-track-pack", app)
         app.swipeUp()
-        capture("09-board-goals", app)
         app.swipeUp()
-        capture("10-board-charts", app)
-        app.swipeUp()
-        app.swipeUp()
-        capture("11-board-work", app)
-        app.swipeDown()
-        app.swipeDown()
-        app.swipeDown()
+        capture("11b-board-charts-and-work", app)
         let goal = app.buttons["goal-engine"]
-        if goal.waitForExistence(timeout: 5) {
+        if scroll(to: goal, app, up: false, swipes: 16), goal.isHittable {
             goal.tap()
             XCTAssertTrue(text(app, containing: "N8 save-guard correction").waitForExistence(timeout: 5))
             capture("12-goal-detail", app)
@@ -120,6 +167,38 @@ final class TeamRoomUITests: XCTestCase {
         capture("14-note-editor", app)
         app.navigationBars.buttons.firstMatch.tap()
         XCTAssertTrue(text(app, containing: "Groceries").waitForExistence(timeout: 5))
+    }
+
+    /// 1.2 (Kewz, 2026-10-04): "allow me to scroll down on the notes, there's a point where I can't scroll down" and
+    /// "a button to hide the keyboard". The end of a long note is reachable with and without the keyboard.
+    func testLongNoteReachesItsEndWithAndWithoutTheKeyboard() {
+        let app = launch(["-ui-open-notes"])
+        let row = text(app, containing: "Hoenn trip ideas")
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        row.tap()
+        let editor = app.textViews["note-editor"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 5))
+        XCTAssertTrue((editor.value as? String)?.hasSuffix("Last line of the long note") == true, "the whole note is loaded")
+        let tabBar = app.tabBars.firstMatch
+        XCTAssertFalse(tabBar.exists && tabBar.isHittable, "the editor has the whole screen; no tab bar over the end of the note")
+        XCTAssertLessThanOrEqual(editor.frame.maxY, app.windows.firstMatch.frame.maxY + 0.5, "the text view ends on screen")
+        XCTAssertFalse(app.buttons["hide-keyboard"].exists, "no keyboard, no hide-keyboard button")
+        for _ in 0..<8 { editor.swipeUp(velocity: .fast) }
+        capture("24-long-note-end", app)
+
+        // With the keyboard the text view ends above it, so the last line can still scroll into view.
+        editor.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        let keyboard = app.keyboards.firstMatch
+        if keyboard.waitForExistence(timeout: 5) {
+            let above = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in editor.frame.maxY <= keyboard.frame.minY + 1 }, object: nil)
+            XCTAssertEqual(XCTWaiter.wait(for: [above], timeout: 5), .completed, "the note ends above the keyboard, not under it")
+        }
+        for _ in 0..<8 { editor.swipeUp(velocity: .fast) }
+        capture("25-long-note-end-keyboard", app)
+        assertHideKeyboardButtonWorks(app, nil)
+        let keyboardGone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: keyboard)
+        XCTAssertEqual(XCTWaiter.wait(for: [keyboardGone], timeout: 5), .completed, "the keyboard is put away")
+        capture("26-long-note-keyboard-hidden", app)
     }
 
     func testInboxSettingsAndBarkSetup() {
@@ -140,7 +219,7 @@ final class TeamRoomUITests: XCTestCase {
         capture("18-dark-team-chat", app)
         app.terminate()
         app = launch(["-ui-dark", "-ui-open-board"])
-        XCTAssertTrue(text(app, containing: "ten-region phase").waitForExistence(timeout: 10))
+        XCTAssertTrue(text(app, containing: "ten regions and a living").waitForExistence(timeout: 10))
         capture("19-dark-board", app)
         app.terminate()
         app = launch(["-ui-large-type", "-ui-open-agents"])
@@ -151,16 +230,14 @@ final class TeamRoomUITests: XCTestCase {
         capture("21-large-type-agents-lower", app)
     }
 
-    /// 1.1.1: Nimbus (cloud engineer, a cloud session the room reports from team-hub/nimbus) has its own card and colour.
-    func testNimbusCardInAgentsList() {
+    /// 1.2 (Kewz, 2026-10-04): Vega and Orion have their own cards and colours; Nimbus retired and has none.
+    func testVegaAndOrionCardsInAgentsList() {
         let app = launch(["-ui-open-agents"])
         XCTAssertTrue(app.buttons["agent-row-claude-assets"].waitForExistence(timeout: 10))
-        let nimbus = app.buttons["agent-row-nimbus"]
-        var swipes = 0
-        while !nimbus.isHittable && swipes < 4 { app.swipeUp(); swipes += 1 }
-        XCTAssertTrue(nimbus.exists, "Nimbus should be listed with the other teammates")
-        XCTAssertTrue(text(app, containing: "Waiting for Polaris").exists)
-        capture("23-agents-nimbus", app)
+        XCTAssertTrue(scroll(to: app.buttons["agent-row-claude-vega"], app), "Vega should be listed with the other teammates")
+        XCTAssertTrue(scroll(to: app.buttons["agent-row-claude-orion"], app), "Orion should be listed with the other teammates")
+        XCTAssertFalse(app.buttons["agent-row-nimbus"].exists, "Nimbus retired")
+        capture("23-agents-vega-orion", app)
     }
 
     /// 1.1 steering: while a Team Room turn runs, the composer says the message goes into that turn.
@@ -171,6 +248,11 @@ final class TeamRoomUITests: XCTestCase {
         polaris.tap()
         let shown = app.descendants(matching: .any)["steer-hint"].waitForExistence(timeout: 10)
         capture(shown ? "22-steer-composer" : "22-steer-composer-hint-missing", app)
+        // 1.2: the agent room's composer has the hide-keyboard button too.
+        let composer = anyElement(app, "agent-composer")
+        XCTAssertTrue(composer.waitForExistence(timeout: 5))
+        composer.tap()
+        assertHideKeyboardButtonWorks(app, "22b-agent-room-typing")
     }
 
     func testFailedDeliverySwipeEditDeleteAndUndo() {

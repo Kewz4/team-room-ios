@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// The main team chat: ask anything about the team; Nova or Atlas answers (whoever is available), with the
-/// reason shown when the question was handed over. Each coordinator answers from a dedicated desk conversation
-/// on its own account, fed a live team digest, so a question never waits behind their work.
+/// The main team chat: ask anything about the team; a coordinator answers (Polaris, Sage, Vega, Orion or Atlas,
+/// whoever is free), with the reason shown when the question was handed over. Each coordinator answers from a
+/// dedicated desk conversation on its own account, fed a live team digest, so a question never waits behind their work.
 struct TeamChatView: View {
     @Environment(AppModel.self) private var model
     @State private var focus: String?
@@ -43,6 +43,9 @@ struct TeamChatView: View {
                     } label: { Image(systemName: "ellipsis") }
                     .accessibilityLabel("More")
                 }
+                if composerFocused {
+                    ToolbarItem(placement: .topBarTrailing) { HideKeyboardButton { composerFocused = false } }
+                }
             }
             .onAppear {
                 model.markRoomSeen()
@@ -76,7 +79,7 @@ struct TeamChatView: View {
                         Text(coordinator.label)
                             .font(.caption2)
                             .foregroundStyle(Tokens.textSecondary)
-                            // 1.1.2: four coordinators share the title row; shrink a name rather than wrap it letter by letter.
+                            // 1.1.2: the coordinators (five since 1.2) share the title row; shrink a name rather than wrap it letter by letter.
                             .lineLimit(1)
                             .minimumScaleFactor(0.75)
                     }
@@ -90,14 +93,16 @@ struct TeamChatView: View {
     /// The room's live roster (1.1.2: the empty chat no longer hard-codes three coordinators).
     private var roster: [Coordinator] { model.room.coordinators.isEmpty ? defaultCoordinators : model.room.coordinators }
 
-    /// "Polaris, Nimbus, Nova or Atlas".
+    /// "Polaris, Sage, Vega, Orion or Atlas".
     private func orList(_ items: [String]) -> String {
         guard let last = items.last else { return "A coordinator" }
         return items.count == 1 ? last : items.dropLast().joined(separator: ", ") + " or " + last
     }
 
+    /// Only until the server's roster arrives (1.2, Kewz 2026-10-04: Polaris, Sage, Vega, Orion and Atlas; Nimbus retired).
     private var defaultCoordinators: [Coordinator] {
-        [Coordinator(name: "polaris", label: "Polaris"), Coordinator(name: "nimbus", label: "Nimbus"), Coordinator(name: "nova", label: "Nova"), Coordinator(name: "atlas", label: "Atlas")]
+        [Coordinator(name: "polaris", label: "Polaris"), Coordinator(name: "sage", label: "Sage"), Coordinator(name: "vega", label: "Vega"),
+         Coordinator(name: "orion", label: "Orion"), Coordinator(name: "atlas", label: "Atlas")]
     }
 
     private var emptyState: some View {
@@ -142,9 +147,12 @@ struct TeamChatView: View {
             HStack(alignment: .bottom, spacing: Tokens.Space.s) {
                 Menu {
                     Button { addressee = nil } label: { Label("Whoever is free", systemImage: addressee == nil ? "checkmark" : "person.2") }
-                    Button { addressee = "polaris" } label: { Label("Polaris", systemImage: addressee == "polaris" ? "checkmark" : "person") }
-                    Button { addressee = "nova" } label: { Label("Nova", systemImage: addressee == "nova" ? "checkmark" : "person") }
-                    Button { addressee = "atlas" } label: { Label("Atlas", systemImage: addressee == "atlas" ? "checkmark" : "person") }
+                    // 1.2: one entry per coordinator in the server's roster (1.1.2 hard-coded Polaris, Nova and Atlas).
+                    ForEach(roster) { coordinator in
+                        Button { addressee = coordinator.name } label: {
+                            Label(coordinator.label, systemImage: addressee == coordinator.name ? "checkmark" : "person")
+                        }
+                    }
                 } label: {
                     Group {
                         if let addressee {

@@ -118,6 +118,21 @@ final class TeamRoomTests: XCTestCase {
         XCTAssertEqual(snapshot.coordinators.first?.label, "Polaris")
     }
 
+    // MARK: - Board (1.2)
+
+    func testGoalsDecodeTheirTrackAndGroupIntoWeightedTracks() throws {
+        let json = #"[{"id":"world","title":"Ten-region world","percent":38,"weight":15,"track":"ten-region"},{"id":"economy","title":"Economy rework","percent":5,"weight":15,"track":"pack"},{"id":"quests","title":"Quests","percent":57,"weight":15,"track":"ten-region"},{"id":"loose","title":"No track","percent":10}]"#
+        let goals = try JSONDecoder().decode([Goal].self, from: Data(json.utf8))
+        XCTAssertEqual(goals.map(\.track), ["ten-region", "pack", "ten-region", nil])
+        let tracks = GoalTrack.group(goals)
+        XCTAssertEqual(tracks.map(\.id), ["ten-region", "pack", ""])
+        XCTAssertEqual(tracks[0].goals.map(\.id), ["world", "quests"])
+        XCTAssertEqual(tracks[0].percent, 48, "(38 x 15 + 57 x 15) / 30 = 47.5, rounded like the PC")
+        XCTAssertEqual(tracks[1].percent, 5)
+        XCTAssertEqual(tracks[2].title, "Other goals")
+        XCTAssertEqual(GoalTrack.group(goals.map { var goal = $0; goal.track = nil; return goal }).count, 1, "a plan without tracks is one list")
+    }
+
     // MARK: - Navigation, notes, stores
 
     @MainActor func testDeepLinksFromNotificationsOpenTheRightScreen() {

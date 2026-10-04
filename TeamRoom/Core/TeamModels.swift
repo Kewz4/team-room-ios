@@ -245,6 +245,10 @@ struct Goal: Codable, Hashable, Identifiable {
     var milestoneCount: Int?
     var doneMilestones: Int?
     var note: String?
+    /// 1.2: the redrawn board's track ("ten-region" or "pack", PLAN.json goal.track) and the goal's weight in the
+    /// overall percent, so a track shows the same weighted percent as the PC.
+    var track: String?
+    var weight: Double?
 }
 
 struct Milestone: Codable, Hashable, Identifiable {

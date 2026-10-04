@@ -34,6 +34,10 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
+      - name: Use the on-screen keyboard in the simulator
+        # 1.2: the notes and composer tests check the real keyboard, which a connected hardware keyboard hides.
+        run: defaults write com.apple.iphonesimulator ConnectHardwareKeyboard -bool false
+
       - name: Unit, UI, screenshot and performance tests
         run: |
           set -o pipefail

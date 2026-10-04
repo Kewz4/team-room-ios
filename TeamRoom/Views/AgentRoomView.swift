@@ -8,6 +8,7 @@ struct AgentRoomView: View {
     @State private var selectedEvent: LiveEvent?
     @State private var showDeliveries = false
     @State private var focus: String?
+    @FocusState private var composerFocused: Bool
 
     var body: some View {
         let store = model.conversation(agentId)
@@ -51,7 +52,7 @@ struct AgentRoomView: View {
                         .padding(.horizontal, Tokens.Space.m)
                         .padding(.bottom, Tokens.Space.s)
                 }
-                AgentComposer(agentId: agentId)
+                AgentComposer(agentId: agentId, focused: $composerFocused)
             }
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -72,6 +73,9 @@ struct AgentRoomView: View {
                     Button { Task { await model.checkRunners() } } label: { Label("Recheck runners", systemImage: "stethoscope") }
                 } label: { Image(systemName: "ellipsis") }
                 .accessibilityLabel("More")
+            }
+            if composerFocused {
+                ToolbarItem(placement: .topBarTrailing) { HideKeyboardButton { composerFocused = false } }
             }
         }
         .sheet(isPresented: $showDeliveries) { DeliveryCenter(agentId: agentId) }
@@ -131,8 +135,9 @@ struct AgentStatusStrip: View {
 
 struct AgentComposer: View {
     let agentId: String
+    /// Owned by the room, so its navigation bar can show the hide-keyboard button (1.2).
+    @FocusState.Binding var focused: Bool
     @Environment(AppModel.self) private var model
-    @FocusState private var focused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {

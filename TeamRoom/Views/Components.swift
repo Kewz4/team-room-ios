@@ -28,6 +28,21 @@ struct AgentAvatar: View {
     }
 }
 
+/// 1.2 (Kewz, 2026-10-04: "a button to hide the keyboard"): shown in the navigation bar while a text field is
+/// focused. iOS 26's keyboard toolbar (placement .keyboard) can push a pushed view's content under the keyboard
+/// (Apple developer forums thread 799692), so the app no longer uses it.
+struct HideKeyboardButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "keyboard.chevron.compact.down")
+        }
+        .accessibilityLabel("Hide keyboard")
+        .accessibilityIdentifier("hide-keyboard")
+    }
+}
+
 struct StatusDot: View {
     let state: String?
     var size: CGFloat = 7

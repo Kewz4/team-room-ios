@@ -104,27 +104,45 @@ struct BoardView: View {
                         LaneRow(lane: lane)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier("lane-" + lane.agentId)
                     if lane.id != report.lanes.last?.id { Divider().padding(.leading, 44) }
                 }
             }
         }
     }
 
-    private func goals(_ report: ProgressReport) -> some View {
-        BoardSection(title: "Goals", systemImage: "flag.checkered") {
-            VStack(spacing: 10) {
-                ForEach(report.goals) { goal in
-                    NavigationLink(value: goal) {
-                        GoalCard(goal: goal)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("goal-" + goal.id)
+    /// 1.2 (Kewz, 2026-10-04: "update the board section"): the redrawn board groups its goals into two tracks, the
+    /// ten-region phase and the pack, each with its own weighted percent. A plan without tracks shows one list.
+    @ViewBuilder private func goals(_ report: ProgressReport) -> some View {
+        let tracks = GoalTrack.group(report.goals)
+        if tracks.count > 1 {
+            ForEach(tracks) { track in
+                BoardSection(title: "\(track.title) · \(track.percent)%", systemImage: track.systemImage) {
+                    goalList(track.goals)
                 }
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("track-" + track.id)
+            }
+        } else {
+            BoardSection(title: "Goals", systemImage: "flag.checkered") {
+                goalList(report.goals)
                 if report.goals.isEmpty {
                     Text("No goals in PLAN.json yet. Ask the team chat to set them up.")
                         .font(TypeScale.caption)
                         .foregroundStyle(Tokens.textSecondary)
                 }
+            }
+        }
+    }
+
+    private func goalList(_ goals: [Goal]) -> some View {
+        VStack(spacing: 10) {
+            ForEach(goals) { goal in
+                NavigationLink(value: goal) {
+                    GoalCard(goal: goal)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("goal-" + goal.id)
             }
         }
     }
@@ -358,6 +376,50 @@ struct LaneRow: View {
         if let now = lane.now { return "Now: " + now }
         if let hold = lane.hold?.reason { return "On hold — " + hold }
         return lane.state == "idle" ? "Idle" : "Waiting"
+    }
+}
+
+/// One board track: the goals in one PLAN.json track and their weighted percent (the weights the PC uses).
+struct GoalTrack: Identifiable {
+    let id: String
+    let goals: [Goal]
+
+    var title: String {
+        switch id {
+        case "ten-region": return "Ten-region phase"
+        case "pack": return "Pack improvements"
+        case "": return "Other goals"
+        default: return id.prefix(1).uppercased() + id.dropFirst().replacingOccurrences(of: "-", with: " ")
+        }
+    }
+
+    var systemImage: String {
+        switch id {
+        case "ten-region": return "map"
+        case "pack": return "shippingbox"
+        default: return "flag.checkered"
+        }
+    }
+
+    var percent: Int {
+        let weights = goals.map { max($0.weight ?? 1, 0) }
+        let total = weights.reduce(0, +)
+        guard total > 0 else { return 0 }
+        let sum = zip(goals, weights).reduce(0.0) { $0 + Double($1.0.percent ?? 0) * $1.1 }
+        return Int((sum / total).rounded())
+    }
+
+    /// Tracks in the order their first goal appears in the plan; goals without a track come last.
+    static func group(_ goals: [Goal]) -> [GoalTrack] {
+        var order: [String] = []
+        var byTrack: [String: [Goal]] = [:]
+        for goal in goals {
+            let key = goal.track ?? ""
+            if byTrack[key] == nil { order.append(key) }
+            byTrack[key, default: []].append(goal)
+        }
+        let keys = order.filter { !$0.isEmpty } + (order.contains("") ? [""] : [])
+        return keys.map { GoalTrack(id: $0, goals: byTrack[$0] ?? []) }
     }
 }
 

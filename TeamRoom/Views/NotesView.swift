@@ -137,11 +137,17 @@ struct NoteEditor: View {
             .font(TypeScale.body)
             .focused($focused)
             .scrollContentBackground(.hidden)
+            // 1.2 (Kewz, 2026-10-04: "there's a point where I can't scroll down"): room below the last line, so it
+            // always scrolls clear of the screen edge, and a downward drag puts the keyboard away.
+            .contentMargins(.bottom, Tokens.Space.xl * 3, for: .scrollContent)
+            .scrollDismissesKeyboard(.interactively)
             .padding(.horizontal, 12)
             .background(Tokens.background)
             .accessibilityIdentifier("note-editor")
             .navigationTitle(note?.displayTitle ?? "Note")
             .navigationBarTitleDisplayMode(.inline)
+            // The floating tab bar no longer covers the end of a long note.
+            .toolbar(.hidden, for: .tabBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
@@ -155,9 +161,10 @@ struct NoteEditor: View {
                         Button(role: .destructive) { model.deleteNote(noteId) } label: { Label("Delete", systemImage: "trash") }
                     } label: { Image(systemName: "ellipsis.circle") }
                 }
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("Done") { focused = false }
+                // 1.2: iOS 26's keyboard toolbar pushed this editor's text under the keyboard (Apple developer forums
+                // thread 799692), so the hide-keyboard button lives in the navigation bar instead.
+                if focused {
+                    ToolbarItem(placement: .topBarTrailing) { HideKeyboardButton { focused = false } }
                 }
             }
             .safeAreaInset(edge: .top, spacing: 0) {
