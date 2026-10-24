@@ -255,7 +255,8 @@ final class TeamRoomUITests: XCTestCase {
             let suffix = dark ? "-dark" : ""
             let theme = dark ? ["-ui-dark"] : []
             var app = launch(["-ui-open-agents"] + theme)
-            XCTAssertTrue(app.buttons["agent-row-claude-orion"].waitForExistence(timeout: 10))
+            // Orion's row is below the fold, so a lazy list has not built it yet: wait for the first rows, then scroll.
+            XCTAssertTrue(app.buttons["agent-row-claude-assets"].waitForExistence(timeout: 10))
             let rigel = app.buttons["agent-row-claude-rigel"]
             let reached = scroll(to: rigel, app)
             capture("30-agents-api-workers\(suffix)", app)
