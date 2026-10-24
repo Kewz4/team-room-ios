@@ -318,6 +318,9 @@ struct BudgetChart: View {
                     }
                 }
                 .frame(height: 96)
+                // One element with the spoken summary: Swift Charts otherwise publishes one element per bar, and the chart's
+                // own identifier never reaches VoiceOver or the UI tests.
+                .accessibilityElement(children: .ignore)
                 .accessibilityIdentifier("budget-chart")
                 .accessibilityLabel(summary(days))
             }
