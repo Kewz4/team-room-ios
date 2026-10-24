@@ -221,6 +221,13 @@ struct ConnectionBanner: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
+        VStack(spacing: 0) {
+            if model.phase == .ready { UpdateBanner() }
+            connection
+        }
+    }
+
+    @ViewBuilder private var connection: some View {
         if model.phase == .ready, model.socketStatus != .live || model.syncError != nil {
             HStack(spacing: Tokens.Space.s) {
                 if model.socketStatus == .connecting || model.socketStatus == .reconnecting {

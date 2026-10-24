@@ -294,6 +294,16 @@ actor TeamRoomClient {
         _ = try await data(for: post(try endpoint("/api/push/test"), Empty()))
     }
 
+    // MARK: - App update
+
+    /// GET /api/app-update. A 404, a failed request or JSON that does not decode all mean "nothing to offer".
+    func appUpdate() async -> AppUpdateInfo? {
+        guard let url = try? endpoint("/api/app-update"),
+              let (data, http) = try? await exchange(get(url)),
+              (200..<300).contains(http.statusCode) else { return nil }
+        return try? JSONDecoder().decode(AppUpdateInfo.self, from: data)
+    }
+
     // MARK: - Bark background notifications
 
     func barkStatus() async throws -> BarkStatus {

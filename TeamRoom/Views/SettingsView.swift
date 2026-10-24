@@ -40,6 +40,8 @@ struct SettingsView: View {
                     Text("Background notifications reach you when Team Room is closed, through the Bark app with end-to-end encryption. While the app is open it shows alerts itself.")
                 }
 
+                AppUpdateSection()
+
                 Section("Connection") {
                     LabeledContent("Address", value: hostLabel)
                     LabeledContent("Live updates", value: socketLabel)
@@ -138,6 +140,11 @@ struct SettingsView: View {
 
     private func usageLine(_ agent: Agent) -> String {
         var parts: [String] = []
+        if let budget = agent.usage?.budget, budget.hasAnything {
+            if let today = budget.todayLine { parts.append(today) }
+            if let cycle = budget.cycleLine { parts.append(cycle) }
+            return parts.joined(separator: " · ")
+        }
         if let balance = agent.usage?.balance {
             let amounts = balance.walletAmounts
             parts.append(amounts.isEmpty ? "Balance not reported" : "Balance \(amounts.joined(separator: " · "))")

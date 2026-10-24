@@ -76,6 +76,20 @@ rendering, payload decoding with clock and memory metrics; scroll hitch rate and
 tests that capture every screen populated with the real team and board numbers — light, dark and an accessibility text
 size. Screenshots and `results-and-metrics.txt` are in the `TeamRoom-qa` artifact of every run.
 
+## 1.3.0
+
+- **API money for Rigel and Lyra.** An agent that carries `usage.budget` (the API-credit workers) shows "Today $1.20 / $9.25"
+  with a thin bar in the agents list instead of the balance chip. Its room has a panel under the status strip with
+  "Today $x of $y" and "This cycle $a of $b · renews Nov 14" bars; a tap opens the last 14 days as a bar chart (Swift
+  Charts) with the daily cap as a dashed line. Every field decodes on its own, so one bad value never blanks the app.
+  Rigel is cyan and Lyra lime; nobody else uses those colours.
+- **Update notice.** At launch and whenever the app comes back to the foreground it asks the PC for `GET /api/app-update`
+  (`{build, version, notes?, installUrl?}`). When `build` is above the installed build, a banner "Team Room <version> is
+  ready" with an Install button (an `itms-services://` or https link) shows on every tab; with no link it shows the text
+  only. A 404 or bad JSON shows nothing. Settings has an App section: installed version and build, when it last checked,
+  and a Check button. This works however the app was installed (KravaSign, a file).
+- QA screenshots 30-35: the list and Rigel's and Lyra's rooms, light and dark, and one with the update banner.
+
 ## 0.6.0 — DeepSeek balance and the harness teammate
 
 - Decodes the bridge's `usage.balance` object: amount, currency, source, freshness, and every wallet on a

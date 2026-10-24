@@ -42,6 +42,9 @@ struct AgentRoomView: View {
             VStack(spacing: 0) {
                 ConnectionBanner()
                 if let agent { AgentStatusStrip(agent: agent) }
+                if let agent, let budget = agent.usage?.budget, budget.hasAnything {
+                    BudgetPanel(budget: budget, color: AgentStyle.color(AgentStyle.worker(for: agent)))
+                }
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {

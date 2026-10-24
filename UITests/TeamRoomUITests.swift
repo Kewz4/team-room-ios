@@ -249,6 +249,42 @@ final class TeamRoomUITests: XCTestCase {
         capture("23-agents-vega-orion", app)
     }
 
+    /// 1.3 (Kewz, 2026-10-23): Rigel and Lyra show their API money, in the list and in the room, light and dark.
+    func testApiWorkersShowTodayAndCycleSpend() {
+        for dark in [false, true] {
+            let suffix = dark ? "-dark" : ""
+            let theme = dark ? ["-ui-dark"] : []
+            var app = launch(["-ui-open-agents"] + theme)
+            XCTAssertTrue(app.buttons["agent-row-claude-orion"].waitForExistence(timeout: 10))
+            let rigel = app.buttons["agent-row-claude-rigel"]
+            let reached = scroll(to: rigel, app)
+            capture("30-agents-api-workers\(suffix)", app)
+            XCTAssertTrue(reached, "Rigel should be listed")
+            XCTAssertTrue(rigel.label.contains("Today $1.20 / $9.25"), "Rigel's card shows today's spend against its cap")
+            app = launch(["-ui-open-rigel"] + theme)
+            XCTAssertTrue(anyElement(app, "budget-panel").waitForExistence(timeout: 10))
+            capture("31-rigel-room\(suffix)", app)
+            app = launch(["-ui-open-rigel", "-ui-budget-open"] + theme)
+            XCTAssertTrue(anyElement(app, "budget-chart").waitForExistence(timeout: 10))
+            capture("32-rigel-room-chart\(suffix)", app)
+            app = launch(["-ui-open-lyra", "-ui-budget-open"] + theme)
+            XCTAssertTrue(anyElement(app, "budget-chart").waitForExistence(timeout: 10))
+            capture("33-lyra-room-chart\(suffix)", app)
+        }
+    }
+
+    /// 1.3: a newer build offered by the PC shows a banner with Install, and Settings lists the installed build.
+    func testUpdateBannerAndSettingsVersion() {
+        let app = launch(["-ui-open-agents", "-ui-update-banner"])
+        XCTAssertTrue(anyElement(app, "update-banner").waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["update-install"].exists)
+        capture("34-update-banner", app)
+        app.buttons["settings-button"].tap()
+        let installed = app.staticTexts["Installed"].waitForExistence(timeout: 5)
+        capture("35-settings-update", app)
+        XCTAssertTrue(installed, "Settings lists the installed version and build")
+    }
+
     /// 1.1 steering: while a Team Room turn runs, the composer says the message goes into that turn.
     func testSteeringComposerOnARunningTurn() {
         let app = launch(["-ui-open-agents"])

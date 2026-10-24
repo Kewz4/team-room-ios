@@ -98,6 +98,41 @@ final class TeamRoomTests: XCTestCase {
         XCTAssertNil(broken.usage?.monthly)
     }
 
+    /// 1.3: the API-credit budget decodes field by field; bad values are dropped and never hide the teammate.
+    func testBudgetDecodesAndToleratesBadValues() throws {
+        let json = #"{"id":"claude-rigel","label":"Rigel","worker":"rigel","usage":{"balance":{"available":true,"currency":"USD","total":"198.80"},"budget":{"kind":"api-credit","currency":"USD","model":"claude-sonnet-5-5","effort":"high","pacing":"carry","today":{"day":"2026-10-27","spent":1.2,"cap":9.25,"left":8.05},"cycle":{"start":"2026-10-23T00:00:00.000Z","renewsAt":"2026-11-14T00:00:00.000Z","credit":200,"spent":32.4,"left":167.6,"daysLeft":18},"history":[{"day":"2026-10-26","spent":7.85},{"day":"2026-10-27","spent":1.2}],"lastRunAt":null}}}"#
+        let agent = try JSONDecoder().decode(Agent.self, from: Data(json.utf8))
+        let budget = try XCTUnwrap(agent.usage?.budget)
+        XCTAssertEqual(budget.todayLine, "Today $1.20 / $9.25")
+        XCTAssertEqual(budget.cycleLine, "This cycle $32.40 of $200 · renews Nov 14")
+        XCTAssertEqual(budget.history.map(\.spent), [7.85, 1.2])
+        XCTAssertTrue(budget.showsToday && budget.showsCycle)
+        XCTAssertNotNil(agent.usage?.balance, "the balance chip data still decodes next to the budget")
+        // Wrong types: numbers as text are read, junk is dropped, a day with no name is skipped, the agent stays.
+        let bad = #"{"id":"x","label":"X","usage":{"budget":{"currency":5,"today":{"spent":"2.50","cap":"oops"},"cycle":"nope","history":[{"day":"2026-10-27","spent":"bad"},{"spent":3},7]}}}"#
+        let broken = try JSONDecoder().decode(Agent.self, from: Data(bad.utf8))
+        XCTAssertEqual(broken.usage?.budget?.today?.spent, 2.5)
+        XCTAssertNil(broken.usage?.budget?.today?.cap)
+        XCTAssertNil(broken.usage?.budget?.cycle)
+        XCTAssertEqual(broken.usage?.budget?.history.map(\.day), ["2026-10-27"])
+        XCTAssertFalse(broken.usage?.budget?.showsToday ?? true)
+        let worse = try JSONDecoder().decode(Agent.self, from: Data(#"{"id":"y","label":"Y","usage":{"budget":"oops","monthly":5}}"#.utf8))
+        XCTAssertNil(worse.usage?.budget)
+        XCTAssertEqual(worse.usage?.monthly, 5)
+    }
+
+    /// 1.3: the update answer needs a usable build; the install link must be itms-services or https.
+    func testAppUpdateAnswerDecodes() throws {
+        let full = try JSONDecoder().decode(AppUpdateInfo.self, from: Data(#"{"build":16,"version":"1.3.1","notes":"Fixes","installUrl":"itms-services://?action=download-manifest&url=https%3A%2F%2Fpc.example%2Fm.plist"}"#.utf8))
+        XCTAssertEqual(full.build, 16)
+        XCTAssertEqual(full.installLink?.scheme, "itms-services")
+        let textOnly = try JSONDecoder().decode(AppUpdateInfo.self, from: Data(#"{"build":"17","version":"1.3.2","installUrl":"javascript:alert(1)"}"#.utf8))
+        XCTAssertEqual(textOnly.build, 17)
+        XCTAssertNil(textOnly.installLink)
+        XCTAssertThrowsError(try JSONDecoder().decode(AppUpdateInfo.self, from: Data(#"{"version":"1.3.2"}"#.utf8)))
+        XCTAssertThrowsError(try JSONDecoder().decode(AppUpdateInfo.self, from: Data("<html>".utf8)))
+    }
+
     func testLiveFramesDecodeTeamRoomAndActivityShapesLossily() throws {
         let team = try JSONDecoder().decode(LiveFrame.self, from: Data(#"{"type":"team","revision":9,"agents":[{"id":"gpt-assets","label":"GPT Plus","name":"Scout","rev":4,"waiting":2},{"label":"broken"}]}"#.utf8))
         XCTAssertEqual(team.agents?.map(\.id), ["gpt-assets"])

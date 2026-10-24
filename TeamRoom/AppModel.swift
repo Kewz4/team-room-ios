@@ -21,6 +21,9 @@ final class AppModel {
     var artifact: ArtifactRequest?
     var bark: BarkStatus?
     var updating = false
+    /// 1.3: a build above the installed one that the PC offers (nil: nothing newer, or the PC offers nothing).
+    var update: AppUpdateInfo?
+    var updateCheckedAt: Date?
     var lastSeenRoomId = UserDefaults.standard.string(forKey: "teamroom.room.lastSeen")
 
     let team = TeamStore()
@@ -115,6 +118,7 @@ final class AppModel {
         Task { await refreshRoom() }
         Task { await refreshBoard() }
         Task { await refreshBark() }
+        Task { await checkForUpdate() }
         Task { await syncNotes() }
         Task { await notifications.refreshPermission() }
     }
@@ -127,6 +131,7 @@ final class AppModel {
             live.start()
             live.setForeground(true)
             startPolling()
+            Task { await checkForUpdate() }
             Task {
                 try? await refreshTeam()
                 for id in visibleAgents { await refreshConversation(id) }
@@ -646,6 +651,15 @@ final class AppModel {
         } catch {
             notes.error = (error as? ClientError)?.message ?? error.localizedDescription
         }
+    }
+
+    // MARK: - App update
+
+    func checkForUpdate() async {
+        guard !isUITesting else { return }
+        let offered = await client.appUpdate()
+        updateCheckedAt = Date()
+        update = offered.flatMap { $0.build > InstalledApp.build ? $0 : nil }
     }
 
     // MARK: - Bark

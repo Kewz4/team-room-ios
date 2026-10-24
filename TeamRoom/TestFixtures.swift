@@ -52,6 +52,13 @@ enum TestFixtures {
         if arguments.contains("-ui-open-notes") { model.router.tab = .notes }
         if arguments.contains("-ui-open-inbox") { model.router.tab = .inbox }
         if arguments.contains("-ui-open-nova") { model.router.openAgent("claude-assets") }
+        if arguments.contains("-ui-open-rigel") { model.router.openAgent("claude-rigel") }
+        if arguments.contains("-ui-open-lyra") { model.router.openAgent("claude-lyra") }
+        model.updateCheckedAt = Date()
+        if arguments.contains("-ui-update-banner") {
+            model.update = AppUpdateInfo(build: 16, version: "1.3.1", notes: "A faster agents list and a fix for the spend chart.",
+                                         installUrl: "itms-services://?action=download-manifest&url=https%3A%2F%2Fexample.invalid%2Fteamroom.plist")
+        }
     }
 
     /// 1.2: the roster Kewz set on 2026-10-04 (Vega and Orion joined; Nimbus retired).
@@ -67,7 +74,7 @@ enum TestFixtures {
         func agent(_ id: String, _ name: String, _ account: String, _ model: String, _ provider: String, role: String, state: String,
                    doing: String? = nil, last: String, lastRole: String = "assistant", five: Double? = nil, week: Double? = nil,
                    waiting: Int = 0, hold: AgentHold? = nil, failed: Int = 0, month: Double? = nil, limit: AgentLimit? = nil,
-                   steering: Bool = false, prompts: [AgentPrompt]? = nil, summary: TaskStatus? = nil) -> Agent {
+                   steering: Bool = false, prompts: [AgentPrompt]? = nil, summary: TaskStatus? = nil, budget: AgentBudget? = nil) -> Agent {
             var value = Agent(id: id, label: name, name: name, worker: name.lowercased(), rev: 3,
                               lastMessage: MessagePreview(role: lastRole, text: last, time: "2026-10-02T03:20:00Z"), liveLength: 0, hold: hold, waiting: waiting,
                               account: account, role: role, provider: provider, modelLabel: model, state: state, statusSummary: summary,
@@ -80,6 +87,7 @@ enum TestFixtures {
                             error: "You've hit your session limit · resets 6:10am (America/El_Salvador)")
             }
             value.limit = limit
+            value.usage?.budget = budget
             value.canSteer = steering
             if limit?.held == true {
                 value.quota = AgentQuota(fiveHourStop: nil, weeklyStop: nil, held: true, reason: limit?.reason, resumesAt: limit?.resumesAt)
@@ -118,8 +126,30 @@ enum TestFixtures {
                   doing: "K-P1d: Sage's four Kanto findings", last: "Intake done: Nimbus's handoff, the Kanto kit and the board.", five: 12, week: 3),
             agent("claude-orion", "Orion", "Max 5× · Sage account", "Opus 5.5 · Max", "claude", role: "Building & world engineering · coordinator", state: "idle",
                   last: "Intake done. Light duty until the October 8 reset.", five: 73, week: 31,
-                  summary: TaskStatus(kind: "idle", label: "Last report", detail: "Ready for the Battle Tower fix.", at: "2026-10-02T03:10:00Z", eventId: nil))
+                  summary: TaskStatus(kind: "idle", label: "Last report", detail: "Ready for the Battle Tower fix.", at: "2026-10-02T03:10:00Z", eventId: nil)),
+            // 1.3: the API-credit workers, with the money they have spent by 2026-10-27 (cycle started 10-23).
+            agent("claude-rigel", "Rigel", "Max 20× · API credit", "Sonnet 5.5 · High", "claude", role: "API-credit worker", state: "working",
+                  doing: "Task 0003: the DeepSeek agent and its money counter", last: "Room integration is in: both workers show in the team list.",
+                  budget: budget(credit: 200, renews: "2026-11-14T00:00:00.000Z", cap: 9.25, today: 1.20,
+                                 before: [6.90, 8.85, 7.60, 7.85], daysLeft: 18)),
+            agent("claude-lyra", "Lyra", "Max 5× · API credit", "Sonnet 5.5 · High", "claude", role: "API-credit worker", state: "idle",
+                  last: "The iOS app shows spend and update notices; the build is green.",
+                  budget: budget(credit: 100, renews: "2026-11-19T00:00:00.000Z", cap: 3.75, today: 0.85,
+                                 before: [2.60, 3.45, 3.10, 3.65], daysLeft: 23))
         ]
+    }
+
+    /// 14 days ending 2026-10-27: zero before the cycle began, then `before` and today's spend.
+    static func budget(credit: Double, renews: String, cap: Double, today: Double, before: [Double], daysLeft: Double) -> AgentBudget {
+        let spentBefore = before.reduce(0, +)
+        let amounts = [Double](repeating: 0, count: 13 - before.count) + before + [today]
+        let history = zip(14...27, amounts).map { AgentBudget.Day(day: String(format: "2026-10-%02d", $0), spent: $1) }
+        return AgentBudget(kind: "api-credit", currency: "USD", model: "claude-sonnet-5-5", effort: "high", pacing: "carry",
+                           today: AgentBudget.Today(day: "2026-10-27", spent: today, cap: cap, left: cap - today),
+                           cycle: AgentBudget.Cycle(start: "2026-10-23T00:00:00.000Z", renewsAt: renews, credit: credit,
+                                                    spent: spentBefore + today, left: credit - spentBefore - today, daysLeft: daysLeft),
+                           history: history, lastRunAt: "2026-10-27T15:20:00.000Z", observedAt: "2026-10-27T15:30:00.000Z",
+                           source: "Agent SDK run costs (local ledger)")
     }
 
     static var roomMessages: [RoomMessage] {

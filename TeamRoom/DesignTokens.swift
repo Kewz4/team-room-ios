@@ -97,6 +97,8 @@ enum AgentStyle {
         case "claude-polaris": return "polaris"
         case "claude-vega": return "vega"
         case "claude-orion": return "orion"
+        case "claude-rigel": return "rigel"
+        case "claude-lyra": return "lyra"
         default: return id
         }
     }
@@ -114,6 +116,9 @@ enum AgentStyle {
         case "vega": return Color(light: "B5235A", dark: "F0679E")
         case "orion": return Color(light: "B8312F", dark: "F06C5B")
         case "nimbus": return Color(light: "C93C6E", dark: "FF84AE")
+        // 1.3 (2026-10-23): the API-credit workers get colours nobody else uses.
+        case "rigel": return Color(light: "0C8FB8", dark: "56CCF2")
+        case "lyra": return Color(light: "6F8A0C", dark: "B7D440")
         case "kewz", "you": return Tokens.accent
         case "coordinator": return Color(light: "5B6472", dark: "A8B0BC")
         default: return Tokens.textSecondary

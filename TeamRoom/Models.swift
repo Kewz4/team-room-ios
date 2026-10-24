@@ -74,9 +74,11 @@ struct AgentUsage: Codable, Hashable {
     var monthlyResetAt: String? = nil
     /// Why usage is missing or stale (e.g. the OpenCode Go key was refused).
     var reason: String? = nil
+    /// 1.3: the money of an API-credit worker (Rigel, Lyra): today against the daily cap, the cycle, 14 days.
+    var budget: AgentBudget? = nil
 
     private enum CodingKeys: String, CodingKey {
-        case activity, weekly, fiveHour, updatedAt, source, resetAt, balance, fiveHourResetAt, monthly, monthlyResetAt, reason
+        case activity, weekly, fiveHour, updatedAt, source, resetAt, balance, fiveHourResetAt, monthly, monthlyResetAt, reason, budget
     }
 }
 
@@ -112,6 +114,7 @@ extension AgentUsage {
         monthly = try? values.decodeIfPresent(Double.self, forKey: .monthly)
         monthlyResetAt = try? values.decodeIfPresent(String.self, forKey: .monthlyResetAt)
         reason = try? values.decodeIfPresent(String.self, forKey: .reason)
+        budget = try? values.decodeIfPresent(AgentBudget.self, forKey: .budget)
         if !values.contains(.updatedAt) {
             updatedAt = nil
         } else if try values.decodeNil(forKey: .updatedAt) {

@@ -144,7 +144,9 @@ struct AgentRow: View {
     }
 
     @ViewBuilder private var usage: some View {
-        if let balance = agent.usage?.balance {
+        if let budget = agent.usage?.budget, budget.showsToday {
+            BudgetMeter(budget: budget, color: AgentStyle.color(AgentStyle.worker(for: agent)))
+        } else if let balance = agent.usage?.balance {
             BalanceChip(balance: balance)
         } else if UsageBars.shows(agent.usage) {
             UsageBars(usage: agent.usage)
